@@ -1,76 +1,112 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
+import AppBackground from "../components/AppBackground";
+import AppCard from "../components/AppCard";
+import BackButton from "../components/BackButton";
+
 export default function MatchesPage() {
-  const [myLikes, setMyLikes] = useState([]);
-  const [herLikes, setHerLikes] = useState([]);
   const [matches, setMatches] = useState([]);
 
   useEffect(() => {
-    async function load() {
-      // 1. Deine Likes inkl. Name laden
-      const { data: myData, error: myError } = await supabase
-        .from("likes")
-        .select("name_id, names(name)")
-        .eq("user", "me");
+    async function loadMatches() {
+      // Likes beider Nutzer laden
+      const { data: likes } = await supabase.from("likes").select("*");
 
-      // 2. Ihre Likes inkl. Name laden
-      const { data: herData, error: herError } = await supabase
-        .from("likes")
-        .select("name_id, names(name)")
-        .eq("user", "her");
+      if (!likes) return;
 
-      if (!myError && !herError) {
-        setMyLikes(myData);
-        setHerLikes(herData);
+      const myLikes = likes
+        .filter((l) => l.user === "me")
+        .map((l) => l.name_id);
 
-        // IDs extrahieren
-        const myIds = myData.map((r) => r.name_id);
-        const herIds = herData.map((r) => r.name_id);
+      const herLikes = likes
+        .filter((l) => l.user === "her")
+        .map((l) => l.name_id);
 
-        // Schnittmenge berechnen
-        const shared = myData
-          .filter((r) => herIds.includes(r.name_id))
-          .map((r) => r.names.name);
+      // Schnittmenge bilden
+      const matchedIds = myLikes.filter((id) => herLikes.includes(id));
 
-        setMatches(shared);
+      if (matchedIds.length === 0) {
+        setMatches([]);
+        return;
       }
+
+      // Namen zu IDs laden
+      const { data: names } = await supabase
+        .from("names")
+        .select("*")
+        .in("id", matchedIds)
+        .order("name");
+
+      setMatches(names || []);
     }
 
-    load();
+    loadMatches();
   }, []);
 
   return (
-    <main style={{ padding: 20 }}>
-      <h1>Matches</h1>
+    <AppBackground>
+      <AppCard style={{ position: "relative", paddingBottom: 40 }}>
 
-      {matches.length === 0 ? (
-        <p>Noch keine gemeinsamen Likes.</p>
-      ) : (
-        <ul>
-          {matches.map((name) => (
-            <li key={name}>{name}</li>
-          ))}
-        </ul>
-      )}
+        <BackButton />
 
-      <hr />
+        <h1
+          style={{
+            color: "#1663a6",
+            fontSize: 28,
+            fontWeight: 800,
+            marginBottom: 20,
+            marginTop: 6,
+            textAlign: "center",
+          }}
+        >
+          Matches
+        </h1>
 
-      <h3>Deine Likes</h3>
-      <ul>
-        {myLikes.map((r) => (
-          <li key={r.name_id}>{r.names.name}</li>
-        ))}
-      </ul>
-
-      <h3>Ihre Likes</h3>
-      <ul>
-        {herLikes.map((r) => (
-          <li key={r.name_id}>{r.names.name}</li>
-        ))}
-      </ul>
-    </main>
+        {matches.length === 0 ? (
+          <p
+            style={{
+              color: "#1663a6",
+              fontSize: 18,
+              textAlign: "center",
+              marginTop: 40,
+              opacity: 0.8,
+            }}
+          >
+            Noch keine gemeinsamen Likes.
+          </p>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              width: "100%",
+              gap: 12,
+              marginTop: 10,
+            }}
+          >
+            {matches.map((m) => (
+              <div
+                key={m.id}
+                style={{
+                  background: "linear-gradient(120deg, #e8f3ff 0%, #ffffff 100%)",
+                  padding: "14px 18px",
+                  borderRadius: 14,
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: "#1663a6",
+                  boxShadow: "0 6px 14px rgba(0,0,0,0.15)",
+                  textAlign: "center",
+                }}
+              >
+                {m.name}
+              </div>
+            ))}
+          </div>
+        )}
+      </AppCard>
+    </AppBackground>
   );
 }
