@@ -1,6 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import {
+  Suspense,
+  useState,
+  useEffect
+} from "react";
+
 import { supabase } from "../../lib/supabaseClient";
 import {
   motion,
@@ -16,7 +21,24 @@ import BackButton from "../components/BackButton";
 import { shuffleArray } from "../utils/shuffle";
 import { useSearchParams } from "next/navigation";
 
+
+// -----------------------------------------------------------------------------
+// WRAPPER — wegen Vercel: useSearchParams MUSS in Suspense liegen
+// -----------------------------------------------------------------------------
 export default function SwipeMePage() {
+  return (
+    <Suspense fallback={<AppBackground>Loading…</AppBackground>}>
+      <SwipeMeContent />
+    </Suspense>
+  );
+}
+
+
+
+// -----------------------------------------------------------------------------
+// AB HIER DEINE EIGENTLICHE LOGIK
+// -----------------------------------------------------------------------------
+function SwipeMeContent() {
   const [names, setNames] = useState([]);
   const [index, setIndex] = useState(0);
   const [myLikes, setMyLikes] = useState([]);
@@ -40,14 +62,20 @@ export default function SwipeMePage() {
 
   const current = names[index];
 
-  // 🔹 Namen + bereits gelikte Namen laden + filtern + shufflen
+
+
+  // --------------------------------------------------
+  // Namen laden (gefiltert, ungelikt, Shuffle)
+  // --------------------------------------------------
   useEffect(() => {
-    async function load() {
+    async function loadNames() {
+      // Namen holen
       const { data: namesData } = await supabase
         .from("names")
         .select("*")
         .order("id");
 
+      // Meine Likes holen
       const { data: likesData } = await supabase
         .from("likes")
         .select("name_id")
@@ -55,45 +83,51 @@ export default function SwipeMePage() {
 
       if (!namesData) return;
 
-      const likedIds = new Set((likesData || []).map((r) => r.name_id));
+      const likedIds = new Set((likesData || []).map(r => r.name_id));
 
+      // gender + ungelikt
       const filtered = namesData.filter(
-        (n) =>
+        n =>
           (genderFilter === "all" || n.gender === genderFilter) &&
           !likedIds.has(n.id)
       );
 
-      setMyLikes((likesData || []).map((r) => r.name_id));
       setNames(shuffleArray(filtered));
+      setMyLikes((likesData || []).map(r => r.name_id));
     }
 
-    load();
+    loadNames();
   }, [genderFilter]);
 
-  // 🔹 Karte zurücksetzen + nächste Karte
+
+
+  // --------------------------------------------------
+  // nächste Karte
+  // --------------------------------------------------
   function nextCard() {
-    setIndex((prev) => (prev + 1) % names.length);
+    setIndex(prev => (prev + 1) % names.length);
     x.set(0);
     y.set(0);
     controls.set({ x: 0, y: 0, rotate: 0, opacity: 1 });
   }
 
-  // 🔹 LIKE
+
+
+  // --------------------------------------------------
+  // LIKE
+  // --------------------------------------------------
   async function like() {
     if (!current) return;
 
-    // 1. Like speichern
-    const { error } = await supabase.from("likes").insert({
+    // Like speichern
+    await supabase.from("likes").insert({
       user: "me",
       name_id: current.id,
     });
 
-    if (error) {
-      console.error("INSERT ERROR (me):", error);
-      return;
-    }
+    setMyLikes(prev => [...prev, current.id]);
 
-    // 2. Prüfen, ob Mama denselben Namen schon geliked hat
+    // Prüfen ob Mama schon likte
     const { data: herLikeRows } = await supabase
       .from("likes")
       .select("id")
@@ -101,15 +135,12 @@ export default function SwipeMePage() {
       .eq("name_id", current.id)
       .limit(1);
 
-    if (herLikeRows && herLikeRows.length > 0) {
+    if (herLikeRows?.length > 0) {
       setMatchName(current.name);
       setShowMatch(true);
     }
 
-    // 3. Lokal updaten
-    setMyLikes((prev) => [...prev, current.id]);
-
-    // 4. Animation → rechts raus
+    // Animation
     await controls.start({
       x: 300,
       rotate: 20,
@@ -120,7 +151,11 @@ export default function SwipeMePage() {
     nextCard();
   }
 
-  // 🔹 NOPE
+
+
+  // --------------------------------------------------
+  // NOPE
+  // --------------------------------------------------
   async function nope() {
     await controls.start({
       x: -300,
@@ -132,7 +167,11 @@ export default function SwipeMePage() {
     nextCard();
   }
 
-  // 🔹 SPÄTER (Skip)
+
+
+  // --------------------------------------------------
+  // SPÄTER / SKIP
+  // --------------------------------------------------
   async function skip() {
     await controls.start({
       y: -250,
@@ -145,7 +184,11 @@ export default function SwipeMePage() {
     nextCard();
   }
 
-  // 🔹 Swipe-Handling
+
+
+  // --------------------------------------------------
+  // Drag-End Handler
+  // --------------------------------------------------
   async function handleDragEnd(_, info) {
     const xOffset = info.offset.x;
 
@@ -159,12 +202,20 @@ export default function SwipeMePage() {
     });
   }
 
+
+
   if (!current) {
     return <AppBackground>Loading…</AppBackground>;
   }
 
+
+
+  // --------------------------------------------------
+  // RENDER
+  // --------------------------------------------------
   return (
     <AppBackground>
+
       {/* MATCH POPUP */}
       {showMatch && (
         <div
@@ -181,11 +232,12 @@ export default function SwipeMePage() {
           <motion.div
             initial={{ scale: 0.6, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.7, opacity: 0, y: 10 }}
             transition={{
               duration: 0.28,
               type: "spring",
               stiffness: 260,
-              damping: 18,
+              damping: 18
             }}
             style={{
               background: "white",
@@ -215,6 +267,7 @@ export default function SwipeMePage() {
                 fontSize: 22,
                 fontWeight: 800,
                 color: "#1663a6",
+                marginTop: 10,
                 marginBottom: 8,
               }}
             >
@@ -246,6 +299,7 @@ export default function SwipeMePage() {
                 background: "#4a90e2",
                 color: "white",
                 fontWeight: 600,
+                boxShadow: "0 6px 14px rgba(0,0,0,0.2)",
               }}
             >
               Weiter swipen
@@ -253,6 +307,8 @@ export default function SwipeMePage() {
           </motion.div>
         </div>
       )}
+
+
 
       <AppCard style={{ paddingBottom: 40, position: "relative" }}>
         <BackButton />
@@ -268,7 +324,9 @@ export default function SwipeMePage() {
           Papa Swipe
         </h1>
 
-        {/* SWIPE-KARTE */}
+
+
+        {/* SWIPE CARD */}
         <motion.div
           drag="x"
           animate={controls}
@@ -292,7 +350,7 @@ export default function SwipeMePage() {
             margin: "0 auto 24px auto",
           }}
         >
-          {/* LIKE Overlay – links */}
+          {/* LIKE (links) */}
           <motion.div
             style={{
               opacity: likeOpacity,
@@ -312,7 +370,7 @@ export default function SwipeMePage() {
             Ja ❤️
           </motion.div>
 
-          {/* NOPE Overlay – rechts */}
+          {/* NOPE (rechts) */}
           <motion.div
             style={{
               opacity: nopeOpacity,
@@ -335,15 +393,15 @@ export default function SwipeMePage() {
           {current.name}
         </motion.div>
 
+
+
         {/* BUTTONS */}
-        <div
-          style={{
-            display: "flex",
-            gap: 16,
-            width: "100%",
-            justifyContent: "center",
-          }}
-        >
+        <div style={{
+          display: "flex",
+          gap: 16,
+          width: "100%",
+          justifyContent: "center"
+        }}>
           <AppButton onClick={nope} style={{ background: "#ff4d4d" }}>
             Nope
           </AppButton>
@@ -356,6 +414,7 @@ export default function SwipeMePage() {
             Like
           </AppButton>
         </div>
+
       </AppCard>
     </AppBackground>
   );
