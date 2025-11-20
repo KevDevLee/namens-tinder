@@ -23,7 +23,7 @@ import { useSearchParams } from "next/navigation";
 
 
 // -----------------------------------------------------------------------------
-// WRAPPER — wegen Vercel: useSearchParams MUSS in Suspense liegen
+// WRAPPER — Vercel fix (useSearchParams requires Suspense)
 // -----------------------------------------------------------------------------
 export default function SwipeMePage() {
   return (
@@ -36,7 +36,7 @@ export default function SwipeMePage() {
 
 
 // -----------------------------------------------------------------------------
-// AB HIER DEINE EIGENTLICHE LOGIK
+// MAIN COMPONENT
 // -----------------------------------------------------------------------------
 function SwipeMeContent() {
   const [names, setNames] = useState([]);
@@ -46,6 +46,10 @@ function SwipeMeContent() {
   const [showMatch, setShowMatch] = useState(false);
   const [matchName, setMatchName] = useState("");
 
+  // ⭐ SECRET STATS UNLOCK
+  const [tapCount, setTapCount] = useState(0);
+  const [showStatsButton, setShowStatsButton] = useState(false);
+
   const searchParams = useSearchParams();
   const genderFilter = searchParams.get("g") || "all";
 
@@ -53,29 +57,23 @@ function SwipeMeContent() {
   const y = useMotionValue(0);
   const controls = useAnimation();
 
-  const likeOpacity = useTransform(x, (v) =>
-    v > 0 ? Math.min(v / 140, 1) : 0
-  );
-  const nopeOpacity = useTransform(x, (v) =>
-    v < 0 ? Math.min(Math.abs(v) / 140, 1) : 0
-  );
+  const likeOpacity = useTransform(x, v => v > 0 ? Math.min(v / 140, 1) : 0);
+  const nopeOpacity = useTransform(x, v => v < 0 ? Math.min(Math.abs(v) / 140, 1) : 0);
 
   const current = names[index];
 
 
 
   // --------------------------------------------------
-  // Namen laden (gefiltert, ungelikt, Shuffle)
+  // Namen laden (filtered, not liked, shuffled)
   // --------------------------------------------------
   useEffect(() => {
     async function loadNames() {
-      // Namen holen
       const { data: namesData } = await supabase
         .from("names")
         .select("*")
         .order("id");
 
-      // Meine Likes holen
       const { data: likesData } = await supabase
         .from("likes")
         .select("name_id")
@@ -85,7 +83,6 @@ function SwipeMeContent() {
 
       const likedIds = new Set((likesData || []).map(r => r.name_id));
 
-      // gender + ungelikt
       const filtered = namesData.filter(
         n =>
           (genderFilter === "all" || n.gender === genderFilter) &&
@@ -101,9 +98,6 @@ function SwipeMeContent() {
 
 
 
-  // --------------------------------------------------
-  // nächste Karte
-  // --------------------------------------------------
   function nextCard() {
     setIndex(prev => (prev + 1) % names.length);
     x.set(0);
@@ -113,13 +107,9 @@ function SwipeMeContent() {
 
 
 
-  // --------------------------------------------------
-  // LIKE
-  // --------------------------------------------------
   async function like() {
     if (!current) return;
 
-    // Like speichern
     await supabase.from("likes").insert({
       user: "me",
       name_id: current.id,
@@ -127,7 +117,6 @@ function SwipeMeContent() {
 
     setMyLikes(prev => [...prev, current.id]);
 
-    // Prüfen ob Mama schon likte
     const { data: herLikeRows } = await supabase
       .from("likes")
       .select("id")
@@ -140,7 +129,6 @@ function SwipeMeContent() {
       setShowMatch(true);
     }
 
-    // Animation
     await controls.start({
       x: 300,
       rotate: 20,
@@ -153,9 +141,6 @@ function SwipeMeContent() {
 
 
 
-  // --------------------------------------------------
-  // NOPE
-  // --------------------------------------------------
   async function nope() {
     await controls.start({
       x: -300,
@@ -169,9 +154,6 @@ function SwipeMeContent() {
 
 
 
-  // --------------------------------------------------
-  // SPÄTER / SKIP
-  // --------------------------------------------------
   async function skip() {
     await controls.start({
       y: -250,
@@ -186,9 +168,6 @@ function SwipeMeContent() {
 
 
 
-  // --------------------------------------------------
-  // Drag-End Handler
-  // --------------------------------------------------
   async function handleDragEnd(_, info) {
     const xOffset = info.offset.x;
 
@@ -202,17 +181,48 @@ function SwipeMeContent() {
     });
   }
 
+  if (names.length === 0) {
+  return (
+    <AppBackground>
+      <AppCard style={{ textAlign: "center", paddingBottom: 40 }}>
+        <h2 style={{ color: "#1663a6", fontSize: 24, marginBottom: 12 }}>
+          Keine weiteren Namen!
+        </h2>
+        <p style={{ color: "#555", marginBottom: 24 }}>
+          Ihr habt alle passenden Namen durchgeswiped.
+        </p>
+
+        <AppButton href="/" style={{ marginBottom: 12 }}>
+          Zur Startseite
+        </AppButton>
+
+        <AppButton href="/matches" style={{ background: "#7ab6ff" }}>
+          Matches anzeigen
+        </AppButton>
+      </AppCard>
+    </AppBackground>
+  );
+}
 
 
-  if (!current) {
-    return <AppBackground>Loading…</AppBackground>;
+
+  // ============================================================
+  // SECRET TAP HANDLER
+  // ============================================================
+  function handleSecretTap() {
+    const newCount = tapCount + 1;
+    setTapCount(newCount);
+
+    if (newCount >= 5) {
+      setShowStatsButton(true);
+    }
   }
 
 
 
-  // --------------------------------------------------
+  // ============================================================
   // RENDER
-  // --------------------------------------------------
+  // ============================================================
   return (
     <AppBackground>
 
@@ -311,14 +321,19 @@ function SwipeMeContent() {
 
 
       <AppCard style={{ paddingBottom: 40, position: "relative" }}>
+
         <BackButton />
 
+        {/** SECRET TAP-AREA */}
         <h1
+          onClick={handleSecretTap}
           style={{
             color: "#1663a6",
             fontSize: 28,
             marginBottom: 12,
             marginTop: 6,
+            userSelect: "none",
+            cursor: "default",     // <- NICHT KLİCKBAR AUSSEHEN
           }}
         >
           Papa Swipe
@@ -350,6 +365,7 @@ function SwipeMeContent() {
             margin: "0 auto 24px auto",
           }}
         >
+
           {/* LIKE (links) */}
           <motion.div
             style={{
@@ -416,6 +432,33 @@ function SwipeMeContent() {
         </div>
 
       </AppCard>
+
+
+      {/* SECRET STATS BUTTON */}
+      {showStatsButton && (
+        <motion.a
+          href="/stats"
+          initial={{ opacity: 0, scale: 0.6 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.25 }}
+          style={{
+            position: "fixed",
+            bottom: 22,
+            right: 22,
+            background: "#4a90e2",
+            color: "white",
+            fontSize: 16,
+            padding: "12px 16px",
+            borderRadius: 12,
+            textDecoration: "none",
+            boxShadow: "0 6px 16px rgba(0,0,0,0.25)",
+            fontWeight: 600,
+          }}
+        >
+          📊 Stats
+        </motion.a>
+      )}
+
     </AppBackground>
   );
 }

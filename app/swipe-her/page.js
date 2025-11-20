@@ -201,12 +201,28 @@ function SwipeHerContent() {
     });
   }
 
+if (names.length === 0) {
+  return (
+    <AppBackground>
+      <AppCard style={{ textAlign: "center", paddingBottom: 40 }}>
+        <h2 style={{ color: "#1663a6", fontSize: 24, marginBottom: 12 }}>
+          Keine weiteren Namen!
+        </h2>
+        <p style={{ color: "#555", marginBottom: 24 }}>
+          Ihr habt alle passenden Namen durchgeswiped.
+        </p>
 
+        <AppButton href="/" style={{ marginBottom: 12 }}>
+          Zur Startseite
+        </AppButton>
 
-  if (!current) {
-    return <AppBackground>Loading…</AppBackground>;
-  }
-
+        <AppButton href="/matches" style={{ background: "#7ab6ff" }}>
+          Matches anzeigen
+        </AppButton>
+      </AppCard>
+    </AppBackground>
+  );
+}
 
 
   // --------------------------------------------------
