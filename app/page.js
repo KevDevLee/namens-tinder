@@ -7,18 +7,35 @@ import AppButton from "./components/AppButton";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
-
 export default function Home() {
   const [gender, setGender] = useState("all");
 
-useEffect(() => {
-  const stored = window.localStorage.getItem("genderFilter");
-  if (stored) setGender(stored);
-}, []);
+  // Load stored gender
+  useEffect(() => {
+    const stored = window.localStorage.getItem("genderFilter");
+    if (stored) setGender(stored);
+  }, []);
 
-useEffect(() => {
-  window.localStorage.setItem("genderFilter", gender);
-}, [gender]);
+  // Save on change
+  useEffect(() => {
+    window.localStorage.setItem("genderFilter", gender);
+  }, [gender]);
+
+  // --- Button Style Helper ---
+  const getButtonStyle = (isActive, activeColor, inactiveColor) => ({
+    padding: "10px 16px",
+    borderRadius: 12,
+    border: "none",
+    fontSize: 16,
+    fontWeight: 700,
+    transition: "all 0.25s ease",
+    background: isActive ? activeColor : inactiveColor,
+    color: isActive ? "white" : "rgba(0,0,0,0.45)",
+    boxShadow: isActive
+      ? "0 4px 12px rgba(0,0,0,0.25)"
+      : "inset 0 0 0 1px rgba(0,0,0,0.08)",
+    opacity: isActive ? 1 : 0.6,
+  });
 
   return (
     <AppBackground>
@@ -28,6 +45,7 @@ useEffect(() => {
         transition={{ duration: 0.45, ease: "easeOut" }}
       >
         <AppCard>
+          {/* Title */}
           <motion.h1
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -42,6 +60,7 @@ useEffect(() => {
             Swipe. Match. Name.
           </motion.h1>
 
+          {/* Subtitle */}
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -57,68 +76,59 @@ useEffect(() => {
             Findet gemeinsam euren perfekten Babynamen.
           </motion.p>
 
-          {/* Gender Filter */}
-<div
-  style={{
-    background: "#ffffffaa",
-    padding: "12px 16px",
-    borderRadius: 12,
-    marginBottom: 24,
-    display: "flex",
-    gap: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    boxShadow: "0 6px 16px rgba(0,0,0,0.15)",
-    backdropFilter: "blur(6px)",
-  }}
->
-  <button
-    onClick={() => setGender("m")}
-    style={{
-      padding: "8px 14px",
-      borderRadius: 10,
-      border: "none",
-      background: gender === "m" ? "#4a90e2" : "#dbe9ff",
-      color: gender === "m" ? "white" : "#1663a6",
-      fontSize: 16,
-      fontWeight: 600,
-    }}
-  >
-    👦 Junge
-  </button>
+          {/* --- Gender Selector --- */}
+          <div
+            style={{
+              background: "#ffffffbb",
+              padding: "14px 16px",
+              borderRadius: 14,
+              marginBottom: 28,
+              display: "flex",
+              gap: 12,
+              justifyContent: "center",
+              alignItems: "center",
+              boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
+              backdropFilter: "blur(8px)",
+            }}
+          >
+            {/* Junge */}
+            <button
+              onClick={() => setGender("m")}
+              style={getButtonStyle(
+                gender === "m",
+                "#4a90e2",
+                "#e5efff"
+              )}
+            >
+              👦 Junge
+            </button>
 
-  <button
-    onClick={() => setGender("w")}
-    style={{
-      padding: "8px 14px",
-      borderRadius: 10,
-      border: "none",
-      background: gender === "w" ? "#ff97d1" : "#ffe4f4",
-      color: gender === "w" ? "white" : "#a61c6b",
-      fontSize: 16,
-      fontWeight: 600,
-    }}
-  >
-    👧 Mädchen
-  </button>
+            {/* Mädchen */}
+            <button
+              onClick={() => setGender("w")}
+              style={getButtonStyle(
+                gender === "w",
+                "#ff78c8",
+                "#ffe5f4"
+              )}
+            >
+              👧 Mädchen
+            </button>
 
-  <button
-    onClick={() => setGender("all")}
-    style={{
-      padding: "8px 14px",
-      borderRadius: 10,
-      border: "none",
-      background: gender === "all" ? "#7ab6ff" : "#e1efff",
-      color: gender === "all" ? "white" : "#1663a6",
-      fontSize: 16,
-      fontWeight: 600,
-    }}
-  >
-    ✨ Alle
-  </button>
-</div>
+            {/* Alle */}
+            <button
+              onClick={() => setGender("all")}
+              style={getButtonStyle(
+                gender === "all",
+                "#7ab6ff",
+                "#e6f1ff"
+              )}
+            >
+              ✨ Alle
+            </button>
+          </div>
 
-
+          {/* Navigation Buttons */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -131,9 +141,14 @@ useEffect(() => {
             }}
           >
             <AppButton href={`/swipe-me?g=${gender}`}>Papa Swipe</AppButton>
-            <AppButton href={`/swipe-her?g=${gender}`} style={{ background: "#7ab6ff" }}>
+
+            <AppButton
+              href={`/swipe-her?g=${gender}`}
+              style={{ background: "#7ab6ff" }}
+            >
               Mama Swipe
             </AppButton>
+
             <AppButton
               href="/matches"
               style={{
