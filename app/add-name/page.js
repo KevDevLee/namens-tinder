@@ -23,40 +23,32 @@ export default function AddNamePage() {
 
     const cleanName = name.trim();
 
-    // 1. Prüfen, ob Name in "names" existiert
-    const { data: existingNames } = await supabase
+    // 1. Prüfen, ob Name bereits existiert
+    const { data: existing } = await supabase
       .from("names")
-      .select("*")
-      .ilike("name", cleanName);
+      .select("id")
+      .eq("name", cleanName);
 
-    if (existingNames && existingNames.length > 0) {
+    if (existing && existing.length > 0) {
       setStatus("⚠️ Dieser Name existiert bereits in der Datenbank.");
       return;
     }
 
-    // 2. Prüfen, ob Name schon in likes referenziert ist (falls du manuell was eingetragen hattest)
-    const { data: likedRefs } = await supabase
-      .from("likes")
-      .select("name_id")
-      .eq("name_id", cleanName); // falls ID-basierte Checks nötig wären
-
-    if (likedRefs && likedRefs.length > 0) {
-      setStatus("⚠️ Dieser Name wird bereits in Likes referenziert.");
-      return;
-    }
-
-    // 3. Name einfügen
-    const { error: insertError } = await supabase
+    // 2. Einfügen
+    const { error } = await supabase
       .from("names")
       .insert({
         name: cleanName,
         gender: gender,
       });
 
-    if (insertError) {
+    if (error) {
       setStatus("❌ Fehler beim Einfügen.");
       return;
     }
+
+    // Namensmanager reload triggern
+    localStorage.setItem("reload-names", "true");
 
     setStatus(`✅ "${cleanName}" wurde erfolgreich hinzugefügt.`);
     setName("");
@@ -65,6 +57,8 @@ export default function AddNamePage() {
   return (
     <AppBackground>
       <AppCard style={{ paddingBottom: 40, position: "relative" }}>
+        
+        {/* Back button führt IMMER zur Name-Manager-Seite */}
         <BackButton href="/name-manager" />
 
         <h1
@@ -80,6 +74,7 @@ export default function AddNamePage() {
         </h1>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          
           {/* Name Eingabe */}
           <input
             value={name}
@@ -95,54 +90,53 @@ export default function AddNamePage() {
             }}
           />
 
-{/* Gender Auswahl */}
-<div
-  style={{
-    display: "flex",
-    gap: 12,
-    marginBottom: 20,
-    justifyContent: "center",
-  }}
->
-  {/* Junge */}
-  <button
-    onClick={() => setGender("m")}
-    style={{
-      padding: "10px 16px",
-      borderRadius: 10,
-      border: "2px solid",
-      borderColor: gender === "m" ? "#4a90e2" : "#cccccc",
-      background: gender === "m" ? "#4a90e2" : "#f2f4f8",
-      color: gender === "m" ? "white" : "#7b7b7b",
-      fontSize: 16,
-      fontWeight: 600,
-      transition: "0.2s",
-      opacity: gender === "m" ? 1 : 0.5,   // 👈 stark ausgegraut
-    }}
-  >
-    👦 Junge
-  </button>
+          {/* Gender Auswahl */}
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              marginBottom: 20,
+              justifyContent: "center",
+            }}
+          >
+            {/* Junge */}
+            <button
+              onClick={() => setGender("m")}
+              style={{
+                padding: "10px 16px",
+                borderRadius: 10,
+                border: "2px solid",
+                borderColor: gender === "m" ? "#4a90e2" : "#cccccc",
+                background: gender === "m" ? "#4a90e2" : "#f2f4f8",
+                color: gender === "m" ? "white" : "#7b7b7b",
+                fontSize: 16,
+                fontWeight: 600,
+                opacity: gender === "m" ? 1 : 0.45,
+                transition: "0.25s",
+              }}
+            >
+              👦 Junge
+            </button>
 
-  {/* Mädchen */}
-  <button
-    onClick={() => setGender("w")}
-    style={{
-      padding: "10px 16px",
-      borderRadius: 10,
-      border: "2px solid",
-      borderColor: gender === "w" ? "#ff97d1" : "#cccccc",
-      background: gender === "w" ? "#ff97d1" : "#f2f4f8",
-      color: gender === "w" ? "white" : "#7b7b7b",
-      fontSize: 16,
-      fontWeight: 600,
-      transition: "0.2s",
-      opacity: gender === "w" ? 1 : 0.5,   // 👈 stark ausgegraut
-    }}
-  >
-    👧 Mädchen
-  </button>
-</div>
-
+            {/* Mädchen */}
+            <button
+              onClick={() => setGender("w")}
+              style={{
+                padding: "10px 16px",
+                borderRadius: 10,
+                border: "2px solid",
+                borderColor: gender === "w" ? "#ff97d1" : "#cccccc",
+                background: gender === "w" ? "#ff97d1" : "#f2f4f8",
+                color: gender === "w" ? "white" : "#7b7b7b",
+                fontSize: 16,
+                fontWeight: 600,
+                opacity: gender === "w" ? 1 : 0.45,
+                transition: "0.25s",
+              }}
+            >
+              👧 Mädchen
+            </button>
+          </div>
 
           {/* Add Button */}
           <AppButton
