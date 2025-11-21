@@ -23,7 +23,7 @@ import { useSearchParams } from "next/navigation";
 
 
 // -----------------------------------------------------------------------------
-// WRAPPER (wegen Next.js/Vercel — useSearchParams MUSS in Suspense sein)
+// WRAPPER — wegen useSearchParams (Vercel Fix)
 // -----------------------------------------------------------------------------
 export default function SwipeHerPage() {
   return (
@@ -36,12 +36,11 @@ export default function SwipeHerPage() {
 
 
 // -----------------------------------------------------------------------------
-// AB HIER WIRKLICH DEINE SEITE (keine Änderungen an der Logik nötig)
+// HAUPT-KOMPONENTE
 // -----------------------------------------------------------------------------
 function SwipeHerContent() {
   const [names, setNames] = useState([]);
   const [index, setIndex] = useState(0);
-  const [herLikes, setHerLikes] = useState([]);
 
   const [showMatch, setShowMatch] = useState(false);
   const [matchName, setMatchName] = useState("");
@@ -53,47 +52,42 @@ function SwipeHerContent() {
   const y = useMotionValue(0);
   const controls = useAnimation();
 
-  const likeOpacity = useTransform(x, (v) =>
-    v > 0 ? Math.min(v / 140, 1) : 0
-  );
-  const nopeOpacity = useTransform(x, (v) =>
-    v < 0 ? Math.min(Math.abs(v) / 140, 1) : 0
-  );
+  const likeOpacity = useTransform(x, v => v > 0 ? Math.min(v / 140, 1) : 0);
+  const nopeOpacity = useTransform(x, v => v < 0 ? Math.min(Math.abs(v) / 140, 1) : 0);
 
   const current = names[index];
 
 
 
   // --------------------------------------------------
-  // Namen laden + gefiltert + ungelikte + Shuffle
+  // Namen laden (gefiltert, ungelikt, shuffled)
   // --------------------------------------------------
   useEffect(() => {
     async function loadNames() {
-      // Namen holen
+      // Alle Namen
       const { data: namesData } = await supabase
         .from("names")
         .select("*")
         .order("id");
 
-      // Ihre Likes holen
-      const { data: likesData } = await supabase
-        .from("likes")
+      // Entscheidungen von "her"
+      const { data: decisionsData } = await supabase
+        .from("decisions")
         .select("name_id")
         .eq("user", "her");
 
       if (!namesData) return;
 
-      const likedIds = new Set((likesData || []).map(r => r.name_id));
+      const decidedIds = new Set((decisionsData || []).map(r => r.name_id));
 
-      // gender + keine bereits gelikten Namen
+      // Filter
       const filtered = namesData.filter(
         n =>
           (genderFilter === "all" || n.gender === genderFilter) &&
-          !likedIds.has(n.id)
+          !decidedIds.has(n.id)
       );
 
       setNames(shuffleArray(filtered));
-      setHerLikes((likesData || []).map(r => r.name_id));
     }
 
     loadNames();
@@ -102,7 +96,7 @@ function SwipeHerContent() {
 
 
   // --------------------------------------------------
-  // nächste Karte
+  // nextCard
   // --------------------------------------------------
   function nextCard() {
     setIndex(prev => (prev + 1) % names.length);
@@ -114,37 +108,47 @@ function SwipeHerContent() {
 
 
   // --------------------------------------------------
+  // Entscheidung speichern
+  // --------------------------------------------------
+  async function saveDecision(decision) {
+    if (!current) return;
+
+    await supabase.from("decisions").insert({
+      user: "her",
+      name_id: current.id,
+      decision
+    });
+  }
+
+
+
+  // --------------------------------------------------
   // LIKE
   // --------------------------------------------------
   async function like() {
     if (!current) return;
 
-    await supabase.from("likes").insert({
-      user: "her",
-      name_id: current.id,
-    });
+    await saveDecision("like");
 
-    setHerLikes(prev => [...prev, current.id]);
-
-    // Prüfen ob Papa schon likte → Match!
-    const { data: hisLikeRows } = await supabase
-      .from("likes")
+    // Prüfen ob Papa auch likte
+    const { data: hisDecision } = await supabase
+      .from("decisions")
       .select("id")
       .eq("user", "me")
       .eq("name_id", current.id)
+      .eq("decision", "like")
       .limit(1);
 
-    if (hisLikeRows?.length > 0) {
+    if (hisDecision?.length > 0) {
       setMatchName(current.name);
       setShowMatch(true);
     }
 
-    // Animation
     await controls.start({
       x: 300,
       rotate: 20,
       opacity: 0,
-      transition: { duration: 0.3 },
+      transition: { duration: 0.3 }
     });
 
     nextCard();
@@ -156,11 +160,13 @@ function SwipeHerContent() {
   // NOPE
   // --------------------------------------------------
   async function nope() {
+    await saveDecision("nope");
+
     await controls.start({
       x: -300,
       rotate: -20,
       opacity: 0,
-      transition: { duration: 0.3 },
+      transition: { duration: 0.3 }
     });
 
     nextCard();
@@ -169,14 +175,16 @@ function SwipeHerContent() {
 
 
   // --------------------------------------------------
-  // SPÄTER / SKIP
+  // MAYBE
   // --------------------------------------------------
   async function skip() {
+    await saveDecision("maybe");
+
     await controls.start({
       y: -250,
       opacity: 0,
       rotate: 0,
-      transition: { duration: 0.25 },
+      transition: { duration: 0.25 }
     });
 
     y.set(0);
@@ -197,32 +205,39 @@ function SwipeHerContent() {
     controls.start({
       x: 0,
       rotate: 0,
-      transition: { type: "spring", stiffness: 260, damping: 22 },
+      transition: { type: "spring", stiffness: 260, damping: 22 }
     });
   }
 
-if (names.length === 0) {
-  return (
-    <AppBackground>
-      <AppCard style={{ textAlign: "center", paddingBottom: 40 }}>
-        <h2 style={{ color: "#1663a6", fontSize: 24, marginBottom: 12 }}>
-          Keine weiteren Namen!
-        </h2>
-        <p style={{ color: "#555", marginBottom: 24 }}>
-          Ihr habt alle passenden Namen durchgeswiped.
-        </p>
 
-        <AppButton href="/" style={{ marginBottom: 12 }}>
-          Zur Startseite
-        </AppButton>
 
-        <AppButton href="/matches" style={{ background: "#7ab6ff" }}>
-          Matches anzeigen
-        </AppButton>
-      </AppCard>
-    </AppBackground>
-  );
-}
+  // --------------------------------------------------
+  // keine Namen übrig
+  // --------------------------------------------------
+  if (!current) {
+    return (
+      <AppBackground>
+        <AppCard style={{ textAlign: "center", paddingBottom: 40 }}>
+          <h2 style={{ color: "#1663a6", fontSize: 24, marginBottom: 12 }}>
+            Keine weiteren Namen!
+          </h2>
+
+          <p style={{ color: "#555", marginBottom: 24 }}>
+            Du hast alle passenden Namen bewertet.
+          </p>
+
+          <AppButton href="/" style={{ marginBottom: 12 }}>
+            Zur Startseite
+          </AppButton>
+
+          <AppButton href="/matches" style={{ background: "#7ab6ff" }}>
+            Matches anzeigen
+          </AppButton>
+        </AppCard>
+      </AppBackground>
+    );
+  }
+
 
 
   // --------------------------------------------------
@@ -231,7 +246,7 @@ if (names.length === 0) {
   return (
     <AppBackground>
 
-      {/* Match popup */}
+      {/* MATCH POPUP */}
       {showMatch && (
         <div
           style={{
@@ -247,7 +262,6 @@ if (names.length === 0) {
           <motion.div
             initial={{ scale: 0.6, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.7, opacity: 0, y: 10 }}
             transition={{
               duration: 0.28,
               type: "spring",
@@ -334,6 +348,8 @@ if (names.length === 0) {
             fontSize: 28,
             marginBottom: 12,
             marginTop: 6,
+            userSelect: "none",
+            cursor: "default",
           }}
         >
           Mama Swipe
@@ -362,10 +378,10 @@ if (names.length === 0) {
             color: "#1663a6",
             position: "relative",
             userSelect: "none",
-            margin: "0 auto 24px",
+            margin: "0 auto 24px auto",
           }}
         >
-          {/* LIKE Badge (links) */}
+          {/* LIKE (links) */}
           <motion.div
             style={{
               opacity: likeOpacity,
@@ -385,7 +401,7 @@ if (names.length === 0) {
             Ja ❤️
           </motion.div>
 
-          {/* NOPE Badge (rechts) */}
+          {/* NOPE (rechts) */}
           <motion.div
             style={{
               opacity: nopeOpacity,
@@ -422,7 +438,7 @@ if (names.length === 0) {
           </AppButton>
 
           <AppButton onClick={skip} style={{ background: "#b0b0b0" }}>
-            Später
+            Vielleicht
           </AppButton>
 
           <AppButton onClick={like} style={{ background: "#4cd964" }}>
@@ -431,6 +447,7 @@ if (names.length === 0) {
         </div>
 
       </AppCard>
+
     </AppBackground>
   );
 }

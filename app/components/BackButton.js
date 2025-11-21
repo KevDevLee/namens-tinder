@@ -1,25 +1,28 @@
 "use client";
-import Link from "next/link";
 
-export default function BackButton({ href = "/" }) {
+import { useRouter } from "next/navigation";
+
+export default function BackButton({ style = {} }) {
+  const router = useRouter();
+
   return (
-    <Link
-      href={href}
+    <button
+      onClick={() => router.back()}
       style={{
         position: "absolute",
         top: 12,
         left: 12,
-        background: "#dbe9ff",
-        padding: "8px 12px",
-        borderRadius: 10,
+        padding: "8px 14px",
+        background: "#dce9f8",
         color: "#1663a6",
-        textDecoration: "none",
+        borderRadius: 10,
+        border: "none",
         fontWeight: 600,
-        fontSize: 14,
-        boxShadow: "0 3px 6px rgba(0,0,0,0.15)",
+        boxShadow: "0 3px 8px rgba(0,0,0,0.15)",
+        ...style,
       }}
     >
       Zurück
-    </Link>
+    </button>
   );
 }
