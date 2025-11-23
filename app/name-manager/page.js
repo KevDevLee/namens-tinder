@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import AppBackground from "../components/AppBackground";
+import { fetchAllNames } from "../utils/fetchAllNames"; 
 import AppCard from "../components/AppCard";
 import BackButton from "../components/BackButton";
 import AppButton from "../components/AppButton";
@@ -19,24 +20,19 @@ export default function NameManagerPage() {
   // ----------------------------------------
   // LOAD NAMES
   // ----------------------------------------
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("names")
-        .select("*")
-        .order("name", { ascending: true });
+useEffect(() => {
+  async function load() {
+    const all = await fetchAllNames("all");
+    setNames(all);
+  }
 
-      if (data) setNames(data);
-    }
+  load();
 
-    load();
-
-    // Re-Load after adding a new name
-    const reload = localStorage.getItem("reload-names");
-    if (reload) {
-      load().then(() => localStorage.removeItem("reload-names"));
-    }
-  }, []);
+  const reload = localStorage.getItem("reload-names");
+  if (reload) {
+    load().then(() => localStorage.removeItem("reload-names"));
+  }
+}, []);
 
   // ----------------------------------------
   // FILTER + SEARCH + SORT

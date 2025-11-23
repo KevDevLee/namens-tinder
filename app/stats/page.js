@@ -7,38 +7,48 @@ import AppBackground from "../components/AppBackground";
 import AppCard from "../components/AppCard";
 import BackButton from "../components/BackButton";
 import AppButton from "../components/AppButton";
+import { useRoleGuard } from "../hooks/useRoleGuard";
 
 export default function StatsPage() {
   const [stats, setStats] = useState(null);
+  const { loading: authLoading, allowed } = useRoleGuard();
 
   useEffect(() => {
     loadStats();
   }, []);
 
   async function loadStats() {
-    const { data } = await supabase
-      .from("decisions")
-      .select("user, decision");
+    const [{ data: profileRows }, { data }] = await Promise.all([
+      supabase.from("profiles").select("id, role"),
+      supabase.from("decisions").select("user_id, decision"),
+    ]);
 
-    if (!data) return;
+    if (!data || !profileRows) return;
 
-    const makeCount = (user, type) =>
+    const papaId = profileRows.find((row) => row.role === "papa")?.id;
+    const mamaId = profileRows.find((row) => row.role === "mama")?.id;
+
+    const makeCount = (userId, type) =>
       data.filter(
-        (d) => d.user === user && d.decision === type
+        (d) => d.user_id === userId && d.decision === type
       ).length;
 
     setStats({
       papa: {
-        like: makeCount("me", "like"),
-        nope: makeCount("me", "nope"),
-        maybe: makeCount("me", "maybe"),
+        like: makeCount(papaId, "like"),
+        nope: makeCount(papaId, "nope"),
+        maybe: makeCount(papaId, "maybe"),
       },
       mama: {
-        like: makeCount("her", "like"),
-        nope: makeCount("her", "nope"),
-        maybe: makeCount("her", "maybe"),
+        like: makeCount(mamaId, "like"),
+        nope: makeCount(mamaId, "nope"),
+        maybe: makeCount(mamaId, "maybe"),
       },
     });
+  }
+
+  if (authLoading || !allowed) {
+    return <AppBackground>Loading…</AppBackground>;
   }
 
   if (!stats) {

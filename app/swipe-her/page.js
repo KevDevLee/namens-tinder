@@ -1,29 +1,27 @@
 "use client";
 
-import {
-  Suspense,
-  useState,
-  useEffect
-} from "react";
+import { Suspense, useState, useEffect } from "react";
 
 import { supabase } from "../../lib/supabaseClient";
 import {
   motion,
   useMotionValue,
   useAnimation,
-  useTransform
+  useTransform,
 } from "framer-motion";
-
+import { fetchAllNames } from "../utils/fetchAllNames";
 import AppBackground from "../components/AppBackground";
 import AppCard from "../components/AppCard";
 import AppButton from "../components/AppButton";
 import BackButton from "../components/BackButton";
 import { shuffleArray } from "../utils/shuffle";
 import { useSearchParams } from "next/navigation";
+import { useRoleGuard } from "../hooks/useRoleGuard";
+import { getProfileIdByRole } from "../utils/getProfileIdByRole";
 
 
 // -----------------------------------------------------------------------------
-// WRAPPER — wegen useSearchParams (Vercel Fix)
+// WRAPPER — wegen useSearchParams
 // -----------------------------------------------------------------------------
 export default function SwipeHerPage() {
   return (
@@ -36,14 +34,21 @@ export default function SwipeHerPage() {
 
 
 // -----------------------------------------------------------------------------
-// HAUPT-KOMPONENTE
+// MAIN COMPONENT
 // -----------------------------------------------------------------------------
 function SwipeHerContent() {
+  const { user, allowed, loading } = useRoleGuard("mama");
   const [names, setNames] = useState([]);
   const [index, setIndex] = useState(0);
-
   const [showMatch, setShowMatch] = useState(false);
   const [matchName, setMatchName] = useState("");
+
+  const [lastName, setLastName] = useState("");   // ✔ SSR-safe
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem("babyLastName");
+    if (stored) setLastName(stored);
+  }, []);                                        // ✔ load after mount
 
   const searchParams = useSearchParams();
   const genderFilter = searchParams.get("g") || "all";
@@ -55,6 +60,7 @@ function SwipeHerContent() {
   const likeOpacity = useTransform(x, v => v > 0 ? Math.min(v / 140, 1) : 0);
   const nopeOpacity = useTransform(x, v => v < 0 ? Math.min(Math.abs(v) / 140, 1) : 0);
 
+  const [otherUserId, setOtherUserId] = useState(null);
   const current = names[index];
 
 
@@ -63,35 +69,39 @@ function SwipeHerContent() {
   // Namen laden (gefiltert, ungelikt, shuffled)
   // --------------------------------------------------
   useEffect(() => {
-    async function loadNames() {
-      // Alle Namen
-      const { data: namesData } = await supabase
-        .from("names")
-        .select("*")
-        .order("id");
+    if (!user?.id) return;
 
-      // Entscheidungen von "her"
-      const { data: decisionsData } = await supabase
+    async function loadNames() {
+      const allNames = await fetchAllNames(genderFilter);
+
+      const { data: decisionsData, error } = await supabase
         .from("decisions")
         .select("name_id")
-        .eq("user", "her");
+        .eq("user_id", user.id);
 
-      if (!namesData) return;
+      if (error) {
+        console.error("loadNames her error:", error);
+        setNames(allNames);
+        return;
+      }
 
-      const decidedIds = new Set((decisionsData || []).map(r => r.name_id));
+      const decidedIds = new Set((decisionsData || []).map((d) => d.name_id));
+      const remaining = allNames.filter((n) => !decidedIds.has(n.id));
 
-      // Filter
-      const filtered = namesData.filter(
-        n =>
-          (genderFilter === "all" || n.gender === genderFilter) &&
-          !decidedIds.has(n.id)
-      );
-
-      setNames(shuffleArray(filtered));
+      setNames(shuffleArray(remaining));
     }
 
     loadNames();
-  }, [genderFilter]);
+  }, [genderFilter, user?.id]);
+
+  useEffect(() => {
+    async function loadOther() {
+      const papaId = await getProfileIdByRole("papa");
+      setOtherUserId(papaId);
+    }
+
+    loadOther();
+  }, []);
 
 
 
@@ -108,15 +118,15 @@ function SwipeHerContent() {
 
 
   // --------------------------------------------------
-  // Entscheidung speichern
+  // Entscheidung speichern (like/nope/maybe)
   // --------------------------------------------------
   async function saveDecision(decision) {
-    if (!current) return;
+    if (!current || !user?.id) return;
 
     await supabase.from("decisions").insert({
-      user: "her",
+      user_id: user.id,
       name_id: current.id,
-      decision
+      decision,
     });
   }
 
@@ -130,18 +140,19 @@ function SwipeHerContent() {
 
     await saveDecision("like");
 
-    // Prüfen ob Papa auch likte
-    const { data: hisDecision } = await supabase
-      .from("decisions")
-      .select("id")
-      .eq("user", "me")
-      .eq("name_id", current.id)
-      .eq("decision", "like")
-      .limit(1);
+    if (otherUserId) {
+      const { data: hisDecision } = await supabase
+        .from("decisions")
+        .select("id")
+        .eq("user_id", otherUserId)
+        .eq("name_id", current.id)
+        .eq("decision", "like")
+        .limit(1);
 
-    if (hisDecision?.length > 0) {
-      setMatchName(current.name);
-      setShowMatch(true);
+      if (hisDecision?.length > 0) {
+        setMatchName(current.name);
+        setShowMatch(true);
+      }
     }
 
     await controls.start({
@@ -214,6 +225,10 @@ function SwipeHerContent() {
   // --------------------------------------------------
   // keine Namen übrig
   // --------------------------------------------------
+  if (loading || !allowed || !user) {
+    return <AppBackground>Loading…</AppBackground>;
+  }
+
   if (!current) {
     return (
       <AppBackground>
@@ -221,10 +236,6 @@ function SwipeHerContent() {
           <h2 style={{ color: "#1663a6", fontSize: 24, marginBottom: 12 }}>
             Keine weiteren Namen!
           </h2>
-
-          <p style={{ color: "#555", marginBottom: 24 }}>
-            Du hast alle passenden Namen bewertet.
-          </p>
 
           <AppButton href="/" style={{ marginBottom: 12 }}>
             Zur Startseite
@@ -245,100 +256,6 @@ function SwipeHerContent() {
   // --------------------------------------------------
   return (
     <AppBackground>
-
-      {/* MATCH POPUP */}
-      {showMatch && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 999,
-          }}
-        >
-          <motion.div
-            initial={{ scale: 0.6, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            transition={{
-              duration: 0.28,
-              type: "spring",
-              stiffness: 260,
-              damping: 18
-            }}
-            style={{
-              background: "white",
-              borderRadius: 24,
-              padding: "22px 26px 18px",
-              width: "80%",
-              maxWidth: 320,
-              textAlign: "center",
-              boxShadow: "0 14px 32px rgba(0,0,0,0.35)",
-              position: "relative",
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                top: -26,
-                left: "50%",
-                transform: "translateX(-50%)",
-                fontSize: 40,
-              }}
-            >
-              💞
-            </div>
-
-            <h2
-              style={{
-                fontSize: 22,
-                fontWeight: 800,
-                color: "#1663a6",
-                marginTop: 10,
-                marginBottom: 8,
-              }}
-            >
-              Es ist ein Match! ✨
-            </h2>
-
-            <p style={{ fontSize: 16, marginBottom: 12, color: "#555" }}>
-              Ihr beide mögt den Namen:
-            </p>
-
-            <p
-              style={{
-                fontSize: 24,
-                fontWeight: 800,
-                color: "#1663a6",
-                marginBottom: 18,
-              }}
-            >
-              {matchName}
-            </p>
-
-            <button
-              onClick={() => setShowMatch(false)}
-              style={{
-                padding: "10px 18px",
-                fontSize: 16,
-                borderRadius: 999,
-                border: "none",
-                background: "#4a90e2",
-                color: "white",
-                fontWeight: 600,
-                boxShadow: "0 6px 14px rgba(0,0,0,0.2)",
-              }}
-            >
-              Weiter swipen
-            </button>
-          </motion.div>
-        </div>
-      )}
-
-
-
       <AppCard style={{ paddingBottom: 40, position: "relative" }}>
         <BackButton />
 
@@ -354,7 +271,6 @@ function SwipeHerContent() {
         >
           Mama Swipe
         </h1>
-
 
 
         {/* SWIPE CARD */}
@@ -381,7 +297,6 @@ function SwipeHerContent() {
             margin: "0 auto 24px auto",
           }}
         >
-          {/* LIKE (links) */}
           <motion.div
             style={{
               opacity: likeOpacity,
@@ -401,7 +316,6 @@ function SwipeHerContent() {
             Ja ❤️
           </motion.div>
 
-          {/* NOPE (rechts) */}
           <motion.div
             style={{
               opacity: nopeOpacity,
@@ -421,9 +335,10 @@ function SwipeHerContent() {
             Nein ✖️
           </motion.div>
 
-          {current.name}
+          <div style={{ textAlign: "center" }}>
+            <div>{current.name} {lastName}</div>
+          </div>
         </motion.div>
-
 
 
         {/* BUTTONS */}
@@ -438,7 +353,7 @@ function SwipeHerContent() {
           </AppButton>
 
           <AppButton onClick={skip} style={{ background: "#b0b0b0" }}>
-            Vielleicht
+            Maybe
           </AppButton>
 
           <AppButton onClick={like} style={{ background: "#4cd964" }}>
@@ -447,7 +362,6 @@ function SwipeHerContent() {
         </div>
 
       </AppCard>
-
     </AppBackground>
   );
 }

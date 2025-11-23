@@ -6,45 +6,72 @@ import { supabase } from "../../lib/supabaseClient";
 import AppBackground from "../components/AppBackground";
 import AppCard from "../components/AppCard";
 import BackButton from "../components/BackButton";
+import { useRoleGuard } from "../hooks/useRoleGuard";
+import { getProfileIdByRole } from "../utils/getProfileIdByRole";
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState([]);
+  const [loadingMatches, setLoadingMatches] = useState(true);
+  const { user, role, loading, allowed } = useRoleGuard();
 
   useEffect(() => {
     async function loadMatches() {
-      // Likes beider Nutzer laden
-      const { data: likes } = await supabase.from("likes").select("*");
+      if (!user?.id) return;
 
-      if (!likes) return;
+      setLoadingMatches(true);
 
-      const myLikes = likes
-        .filter((l) => l.user === "me")
-        .map((l) => l.name_id);
+      try {
+        const otherRole = role === "papa" ? "mama" : "papa";
+        const otherUserId = await getProfileIdByRole(otherRole);
 
-      const herLikes = likes
-        .filter((l) => l.user === "her")
-        .map((l) => l.name_id);
+        const [{ data: myDecisions }, { data: otherDecisions }] =
+          await Promise.all([
+            supabase
+              .from("decisions")
+              .select("name_id")
+              .eq("user_id", user.id)
+              .eq("decision", "like"),
+            otherUserId
+              ? supabase
+                  .from("decisions")
+                  .select("name_id")
+                  .eq("user_id", otherUserId)
+                  .eq("decision", "like")
+              : Promise.resolve({ data: [] }),
+          ]);
 
-      // Schnittmenge bilden
-      const matchedIds = myLikes.filter((id) => herLikes.includes(id));
+        const myLikes = new Set((myDecisions || []).map((row) => row.name_id));
+        const shared = (otherDecisions || [])
+          .map((row) => row.name_id)
+          .filter((id) => myLikes.has(id));
 
-      if (matchedIds.length === 0) {
+        if (shared.length === 0) {
+          setMatches([]);
+          setLoadingMatches(false);
+          return;
+        }
+
+        const { data: names } = await supabase
+          .from("names")
+          .select("*")
+          .in("id", shared)
+          .order("name");
+
+        setMatches(names || []);
+      } catch (err) {
+        console.error("loadMatches error:", err);
         setMatches([]);
-        return;
+      } finally {
+        setLoadingMatches(false);
       }
-
-      // Namen zu IDs laden
-      const { data: names } = await supabase
-        .from("names")
-        .select("*")
-        .in("id", matchedIds)
-        .order("name");
-
-      setMatches(names || []);
     }
 
     loadMatches();
-  }, []);
+  }, [user?.id, role]);
+
+  if (loading || !allowed) {
+    return <AppBackground>Loading…</AppBackground>;
+  }
 
   return (
     <AppBackground>
@@ -65,7 +92,19 @@ export default function MatchesPage() {
           Matches
         </h1>
 
-        {matches.length === 0 ? (
+        {loadingMatches ? (
+          <p
+            style={{
+              color: "#1663a6",
+              fontSize: 18,
+              textAlign: "center",
+              marginTop: 40,
+              opacity: 0.8,
+            }}
+          >
+            Lade Matches…
+          </p>
+        ) : matches.length === 0 ? (
           <p
             style={{
               color: "#1663a6",

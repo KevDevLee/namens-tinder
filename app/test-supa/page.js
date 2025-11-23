@@ -11,7 +11,9 @@ export default function Page() {
     async function load() {
       const { data, error } = await supabase
         .from("names")
-        .select("*");
+        .select("*")
+        .order("name", { ascending: true })
+        .range(0, 9000);  // <-- LIMITIERUNG HINZUGEFÜGT
 
       if (error) {
         setError(error.message);

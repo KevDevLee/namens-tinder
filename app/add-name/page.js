@@ -24,10 +24,16 @@ export default function AddNamePage() {
     const cleanName = name.trim();
 
     // 1. Prüfen, ob Name bereits existiert
-    const { data: existing } = await supabase
+    const { data: existing, error: checkError } = await supabase
       .from("names")
       .select("id")
-      .eq("name", cleanName);
+      .ilike("name", cleanName);
+
+    if (checkError) {
+      console.error("SELECT ERROR:", checkError);
+      setStatus(`❌ Fehler bei der Prüfung: ${checkError.message}`);
+      return;
+    }
 
     if (existing && existing.length > 0) {
       setStatus("⚠️ Dieser Name existiert bereits in der Datenbank.");
@@ -35,19 +41,21 @@ export default function AddNamePage() {
     }
 
     // 2. Einfügen
-    const { error } = await supabase
+    const { data: inserted, error: insertError } = await supabase
       .from("names")
       .insert({
         name: cleanName,
         gender: gender,
-      });
+      })
+      .select(); // WICHTIG für klare Fehlermeldungen
 
-    if (error) {
-      setStatus("❌ Fehler beim Einfügen.");
+    if (insertError) {
+      console.error("INSERT ERROR DETAILS:", insertError);
+      setStatus(`❌ Fehler beim Einfügen: ${insertError.message}`);
       return;
     }
 
-    // Namensmanager reload triggern
+    // Namensmanager Reload triggern
     localStorage.setItem("reload-names", "true");
 
     setStatus(`✅ "${cleanName}" wurde erfolgreich hinzugefügt.`);
@@ -58,7 +66,7 @@ export default function AddNamePage() {
     <AppBackground>
       <AppCard style={{ paddingBottom: 40, position: "relative" }}>
         
-        {/* Back button führt IMMER zur Name-Manager-Seite */}
+        {/* Zurück IMMER zum Namensmanager */}
         <BackButton href="/name-manager" />
 
         <h1
@@ -75,7 +83,7 @@ export default function AddNamePage() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           
-          {/* Name Eingabe */}
+          {/* Texteingabe */}
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -146,12 +154,17 @@ export default function AddNamePage() {
             Hinzufügen
           </AppButton>
 
-          {/* Status */}
+          {/* Status Text */}
           {status && (
             <motion.p
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
-              style={{ color: "#1663a6", textAlign: "center", marginTop: 10 }}
+              style={{
+                color: "#1663a6",
+                textAlign: "center",
+                marginTop: 10,
+                fontWeight: 600,
+              }}
             >
               {status}
             </motion.p>

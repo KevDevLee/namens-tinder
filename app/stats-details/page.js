@@ -5,45 +5,49 @@ import { supabase } from "../../lib/supabaseClient";
 import AppBackground from "../components/AppBackground";
 import AppCard from "../components/AppCard";
 import BackButton from "../components/BackButton";
+import { useRoleGuard } from "../hooks/useRoleGuard";
 
 export default function StatsDetailsPage() {
-  const [activeUser, setActiveUser] = useState("me");     // Papa/Mama Tab
-  const [activeType, setActiveType] = useState("like");   // like/maybe/nope Tab
-
+  const [activeUser, setActiveUser] = useState("papa"); // Tabs
+  const [activeType, setActiveType] = useState("like");
   const [data, setData] = useState({
-    me: { like: [], nope: [], maybe: [] },
-    her: { like: [], nope: [], maybe: [] }
+    papa: { like: [], nope: [], maybe: [] },
+    mama: { like: [], nope: [], maybe: [] },
   });
+  const { user, loading, allowed } = useRoleGuard();
 
   // ---------------------------------------------------
   // Daten laden
   // ---------------------------------------------------
   useEffect(() => {
     async function load() {
-      const { data: rows } = await supabase
-        .from("decisions")
-        .select("id, user, decision, name_id, names(name, gender)")
-        .order("id");
+      const [{ data: profileRows }, { data: rows }] = await Promise.all([
+        supabase.from("profiles").select("id, role"),
+        supabase
+          .from("decisions")
+          .select("id, user_id, decision, name_id, names(name, gender)")
+          .order("id"),
+      ]);
 
-      if (!rows) return;
+      if (!rows || !profileRows) return;
 
       const structured = {
-  me: { like: [], nope: [], maybe: [] },
-  her: { like: [], nope: [], maybe: [] }
-};
+        papa: { like: [], nope: [], maybe: [] },
+        mama: { like: [], nope: [], maybe: [] },
+      };
 
-rows.forEach(r => {
-  const group = r.user;
-  const type = r.decision;
+      rows.forEach((r) => {
+        const profile = profileRows.find((p) => p.id === r.user_id);
+        if (!profile?.role) return;
 
-  structured[group][type].push({
-    id: r.id,
-    name_id: r.name_id,
-    name: r.names?.name || "",
-    gender: r.names?.gender || null
-  });
-});
-
+        structured[profile.role][r.decision].push({
+          id: r.id,
+          user_id: r.user_id,
+          name_id: r.name_id,
+          name: r.names?.name || "",
+          gender: r.names?.gender || null,
+        });
+      });
 
       setData(structured);
     }
@@ -55,14 +59,22 @@ rows.forEach(r => {
   // Löschen → Name wieder in Stapel
   // ---------------------------------------------------
   async function removeDecision(idToDelete) {
-    await supabase.from("decisions").delete().eq("id", idToDelete);
+    if (!user?.id) return;
 
-    setData(prev => {
+    await supabase
+      .from("decisions")
+      .delete()
+      .eq("id", idToDelete)
+      .eq("user_id", user.id);
+
+    setData((prev) => {
       const copy = JSON.parse(JSON.stringify(prev));
 
-      ["me", "her"].forEach(user => {
-        ["like", "nope", "maybe"].forEach(cat => {
-          copy[user][cat] = copy[user][cat].filter(item => item.id !== idToDelete);
+      ["papa", "mama"].forEach((role) => {
+        ["like", "nope", "maybe"].forEach((cat) => {
+          copy[role][cat] = copy[role][cat].filter(
+            (item) => item.id !== idToDelete
+          );
         });
       });
 
@@ -70,7 +82,11 @@ rows.forEach(r => {
     });
   }
 
-  const userLabel = activeUser === "me" ? "Papa" : "Mama";
+  if (loading || !allowed) {
+    return <AppBackground>Loading…</AppBackground>;
+  }
+
+  const userLabel = activeUser === "papa" ? "Papa" : "Mama";
   const items = data[activeUser][activeType];
 
   return (
@@ -99,15 +115,15 @@ rows.forEach(r => {
           }}
         >
           <TabButton
-            active={activeUser === "me"}
+            active={activeUser === "papa"}
             label="Papa"
-            onClick={() => setActiveUser("me")}
+            onClick={() => setActiveUser("papa")}
           />
 
           <TabButton
-            active={activeUser === "her"}
+            active={activeUser === "mama"}
             label="Mama"
-            onClick={() => setActiveUser("her")}
+            onClick={() => setActiveUser("mama")}
           />
         </div>
 
@@ -162,41 +178,44 @@ rows.forEach(r => {
         </h3>
         {items
           .filter((item) => item.gender === "m")
-          .map((item) => (
-            <div
-              key={item.id}
-              style={{
-                background: "#ffffff",
-                borderRadius: 8,
-                padding: "8px 10px",
-                marginBottom: 8,
-                boxShadow: "0 4px 10px rgba(0,0,0,0.10)",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span
-                style={{ color: "#1663a6", fontWeight: 600 }}
-              >
-                {item.name}
-              </span>
-              <button
-                onClick={() => removeDecision(item.id)}
+          .map((item) => {
+            const ownEntry = item.user_id === user?.id;
+            return (
+              <div
+                key={item.id}
                 style={{
-                  background: "#ff4d4d",
-                  border: "none",
-                  padding: "6px 10px",
-                  color: "white",
-                  borderRadius: 6,
-                  fontWeight: 600,
-                  fontSize: 14,
+                  background: "#ffffff",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  marginBottom: 8,
+                  boxShadow: "0 4px 10px rgba(0,0,0,0.10)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                 }}
               >
-                X
-              </button>
-            </div>
-          ))}
+                <span style={{ color: "#1663a6", fontWeight: 600 }}>
+                  {item.name}
+                </span>
+                {ownEntry && (
+                  <button
+                    onClick={() => removeDecision(item.id)}
+                    style={{
+                      background: "#ff4d4d",
+                      border: "none",
+                      padding: "6px 10px",
+                      color: "white",
+                      borderRadius: 6,
+                      fontWeight: 600,
+                      fontSize: 14,
+                    }}
+                  >
+                    X
+                  </button>
+                )}
+              </div>
+            );
+          })}
       </div>
 
       {/* Rechte Spalte – Mädchennamen */}
@@ -206,41 +225,44 @@ rows.forEach(r => {
         </h3>
         {items
           .filter((item) => item.gender === "w")
-          .map((item) => (
-            <div
-              key={item.id}
-              style={{
-                background: "#ffffff",
-                borderRadius: 8,
-                padding: "8px 10px",
-                marginBottom: 8,
-                boxShadow: "0 4px 10px rgba(0,0,0,0.10)",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span
-                style={{ color: "#1663a6", fontWeight: 600 }}
-              >
-                {item.name}
-              </span>
-              <button
-                onClick={() => removeDecision(item.id)}
+          .map((item) => {
+            const ownEntry = item.user_id === user?.id;
+            return (
+              <div
+                key={item.id}
                 style={{
-                  background: "#ff4d4d",
-                  border: "none",
-                  padding: "6px 10px",
-                  color: "white",
-                  borderRadius: 6,
-                  fontWeight: 600,
-                  fontSize: 14,
+                  background: "#ffffff",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  marginBottom: 8,
+                  boxShadow: "0 4px 10px rgba(0,0,0,0.10)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                 }}
               >
-                X
-              </button>
-            </div>
-          ))}
+                <span style={{ color: "#1663a6", fontWeight: 600 }}>
+                  {item.name}
+                </span>
+                {ownEntry && (
+                  <button
+                    onClick={() => removeDecision(item.id)}
+                    style={{
+                      background: "#ff4d4d",
+                      border: "none",
+                      padding: "6px 10px",
+                      color: "white",
+                      borderRadius: 6,
+                      fontWeight: 600,
+                      fontSize: 14,
+                    }}
+                  >
+                    X
+                  </button>
+                )}
+              </div>
+            );
+          })}
       </div>
     </div>
   )}
