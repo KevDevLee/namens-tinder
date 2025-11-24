@@ -189,19 +189,19 @@ function SwipeMeContent() {
     const xOffset = offset.x;
     const yOffset = offset.y;
 
-    const fastRight = velocity.x > 600;
-    const fastLeft = velocity.x < -600;
-    const fastUp = velocity.y < -600;
+    const fastRight = velocity.x > 1000;
+    const fastLeft = velocity.x < -1000;
+    const fastUp = velocity.y < -1000;
 
-    if (xOffset > 30 || fastRight) {
+    if ((xOffset > 120 && yOffset > -80 && yOffset < 80) || fastRight) {
       return like();
     }
 
-    if (xOffset < -30 || fastLeft) {
+    if ((xOffset < -120 && yOffset > -80 && yOffset < 80) || fastLeft) {
       return nope();
     }
 
-    if (yOffset < -40 || fastUp) {
+    if (yOffset < -140 || fastUp) {
       return skip();
     }
 
@@ -274,8 +274,8 @@ function SwipeMeContent() {
         <motion.div
           key={current?.id || current?.name}
           drag
-          dragConstraints={{ left: -5, right: 5, top: -5, bottom: 5 }}
-          dragElastic={0.05}
+          dragConstraints={{ left: -100, right: 100, top: -100, bottom: 100 }}
+          dragElastic={0.1}
           dragMomentum={false}
           animate={controls}
           initial={{ x: 0, y: 0, rotate: 0, opacity: 1 }}
@@ -317,6 +317,43 @@ function SwipeMeContent() {
               }}
             />
           )}
+          <motion.div
+            style={{
+              opacity: likeOpacity,
+              position: "absolute",
+              top: 18,
+              left: 18,
+              padding: "8px 14px",
+              fontSize: 22,
+              borderRadius: 12,
+              background: "rgba(76,217,100,0.25)",
+              border: "2px solid #4cd964",
+              color: "#4cd964",
+              transform: "rotate(8deg)",
+              pointerEvents: "none",
+            }}
+          >
+            Ja ❤️
+          </motion.div>
+
+          <motion.div
+            style={{
+              opacity: nopeOpacity,
+              position: "absolute",
+              top: 18,
+              right: 18,
+              padding: "8px 14px",
+              fontSize: 22,
+              borderRadius: 12,
+              background: "rgba(255,59,48,0.25)",
+              border: "2px solid #ff3b30",
+              color: "#ff3b30",
+              transform: "rotate(-8deg)",
+              pointerEvents: "none",
+            }}
+          >
+            Nein ✖️
+          </motion.div>
           {current?.gender && (
             <span
               style={{
