@@ -451,17 +451,6 @@ function SwipeHerContent() {
           </div>
         </motion.div>
 
-
-            }}
-          >
-            Undo
-          </AppButton>
-        </div>
-
-      </AppCard>
-    </AppBackground>
-  );
-}
         <div
           style={{
             width: "100%",
@@ -489,16 +478,9 @@ function SwipeHerContent() {
 
             <AppButton
               onClick={skip}
-              style={{
-                background: "#b0b0b0",
-                flex: 1,
-                minWidth: 0,
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
+              style={{ background: "#b0b0b0", flex: 1, minWidth: 0 }}
             >
-              <span>Maybe</span>
+              Maybe
             </AppButton>
 
             <AppButton
@@ -526,3 +508,8 @@ function SwipeHerContent() {
             Undo
           </AppButton>
         </div>
+
+      </AppCard>
+    </AppBackground>
+  );
+}
