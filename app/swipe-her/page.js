@@ -256,7 +256,12 @@ function SwipeHerContent() {
   // --------------------------------------------------
   return (
     <AppBackground>
-      <AppCard style={{ paddingBottom: 40, position: "relative" }}>
+      <AppCard
+        style={{
+          paddingBottom: 40,
+          position: "relative",
+        }}
+      >
         <div style={{ width: "100%", display: "flex", justifyContent: "flex-start" }}>
           <BackButton />
         </div>
@@ -299,6 +304,37 @@ function SwipeHerContent() {
             margin: "0 auto 24px auto",
           }}
         >
+          {current?.gender && (
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                width: 0,
+                height: 0,
+                borderStyle: "solid",
+                borderWidth: "0 50px 50px 0",
+                borderColor: `transparent ${
+                  current.gender === "m" ? "#7ab6ff" : "#ff96cf"
+                } transparent transparent`,
+                borderTopRightRadius: 24,
+              }}
+            />
+          )}
+          {current?.gender && (
+            <span
+              style={{
+                position: "absolute",
+                top: 8,
+                right: 12,
+                color: "white",
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              {current.gender === "m" ? "👦" : "👧"}
+            </span>
+          )}
           <motion.div
             style={{
               opacity: likeOpacity,
