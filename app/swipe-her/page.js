@@ -257,7 +257,9 @@ function SwipeHerContent() {
   return (
     <AppBackground>
       <AppCard style={{ paddingBottom: 40, position: "relative" }}>
-        <BackButton />
+        <div style={{ width: "100%", display: "flex", justifyContent: "flex-start" }}>
+          <BackButton />
+        </div>
 
         <h1
           style={{

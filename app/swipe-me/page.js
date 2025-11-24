@@ -226,11 +226,10 @@ function SwipeMeContent() {
 
   return (
     <AppBackground>
-
-      <AppCard style={{ paddingBottom: 40 }}>
-
-        <BackButton />
-
+      <AppCard style={{ paddingBottom: 40, position: "relative" }}>
+        <div style={{ width: "100%", display: "flex", justifyContent: "flex-start" }}>
+          <BackButton />
+        </div>
         <h1
           onClick={handleSecretTap}
           style={{

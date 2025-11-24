@@ -7,10 +7,10 @@ import AppCard from "../components/AppCard";
 import BackButton from "../components/BackButton";
 import { useRoleGuard } from "../hooks/useRoleGuard";
 
-const sections = [
-  { key: "like", label: "❤️ Likes", color: "#1663a6" },
-  { key: "maybe", label: "🤔 Vielleicht", color: "#f0a500" },
-  { key: "nope", label: "🙅‍♂️ Nopes", color: "#d7263d" },
+const tabs = [
+  { key: "like", label: "Likes" },
+  { key: "maybe", label: "Maybe" },
+  { key: "nope", label: "Nopes" },
 ];
 
 export default function MyDecisionsPage() {
@@ -21,6 +21,7 @@ export default function MyDecisionsPage() {
     nope: [],
   });
   const [busy, setBusy] = useState(true);
+  const [activeTab, setActiveTab] = useState("like");
 
   useEffect(() => {
     if (loading || !allowed || !user?.id) return;
@@ -57,9 +58,37 @@ export default function MyDecisionsPage() {
     return <AppBackground>Loading…</AppBackground>;
   }
 
+  const list = entries[activeTab] || [];
+
+  async function removeDecision(idToDelete) {
+    if (!user?.id) return;
+
+    await supabase
+      .from("decisions")
+      .delete()
+      .eq("id", idToDelete)
+      .eq("user_id", user.id);
+
+    setEntries((prev) => {
+      const copy = structuredClone(prev);
+      ["like", "maybe", "nope"].forEach((type) => {
+        copy[type] = copy[type].filter((item) => item.id !== idToDelete);
+      });
+      return copy;
+    });
+  }
+
   return (
     <AppBackground>
-      <AppCard style={{ gap: 20, paddingBottom: 32, width: "100%" }}>
+      <AppCard
+        style={{
+          gap: 18,
+          paddingBottom: 32,
+          width: "100%",
+          maxHeight: "90vh",
+          overflow: "hidden",
+        }}
+      >
         <BackButton />
         <h1
           style={{
@@ -71,75 +100,145 @@ export default function MyDecisionsPage() {
         >
           Meine Entscheidungen
         </h1>
-        <p style={{ color: "#4a4a4a", marginBottom: 12 }}>
+        <p style={{ color: "#4a4a4a", marginBottom: 8 }}>
           Hier findest du alle Namen, die du bereits bewertet hast.
         </p>
 
-        {sections.map((section) => {
-          const items = entries[section.key] || [];
-          return (
+        <div
+          style={{
+            display: "flex",
+            marginBottom: 4,
+            gap: 6,
+            width: "100%",
+          }}
+        >
+          {tabs.map((tab) => (
+            <TabButton
+              key={tab.key}
+              active={activeTab === tab.key}
+              label={`${tab.label} (${entries[tab.key]?.length || 0})`}
+              onClick={() => setActiveTab(tab.key)}
+            />
+          ))}
+        </div>
+
+        <div
+          style={{
+            width: "100%",
+            flex: 1,
+            overflowY: "auto",
+            paddingRight: 6,
+          }}
+        >
+          {list.length === 0 ? (
+            <p style={{ color: "#777", fontSize: 14 }}>Keine Einträge.</p>
+          ) : (
             <div
-              key={section.key}
               style={{
-                width: "100%",
-                textAlign: "left",
-                background: "#f6fbff",
-                padding: "12px 16px",
-                borderRadius: 14,
-                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
               }}
             >
-              <h3
-                style={{
-                  color: section.color,
-                  fontSize: 18,
-                  marginBottom: 10,
-                }}
-              >
-                {section.label} ({items.length})
-              </h3>
+              <GenderList
+                title="Jungen"
+                items={list.filter((i) => i.gender === "m")}
+                onRemove={removeDecision}
+              />
+              <GenderList
+                title="Mädchen"
+                items={list.filter((i) => i.gender === "w")}
+                onRemove={removeDecision}
+              />
 
-              {items.length === 0 ? (
-                <p style={{ color: "#777", fontSize: 14 }}>Keine Einträge.</p>
-              ) : (
-                <ul
-                  style={{
-                    listStyle: "none",
-                    padding: 0,
-                    margin: 0,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                  }}
-                >
-                  {items.map((item) => (
-                    <li
-                      key={item.id}
-                      style={{
-                        background: "white",
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        color: "#1663a6",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <span>{item.name}</span>
-                      {item.gender && (
-                        <span style={{ fontSize: 14, opacity: 0.7 }}>
-                          {item.gender === "m" ? "👦" : "👧"}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+              {list.some((i) => i.gender !== "m" && i.gender !== "w") && (
+                <div style={{ gridColumn: "1 / span 2" }}>
+                  <GenderList
+                    title="✨ Ohne Zuordnung"
+                    items={list.filter((i) => i.gender !== "m" && i.gender !== "w")}
+                    onRemove={removeDecision}
+                  />
+                </div>
               )}
             </div>
-          );
-        })}
+          )}
+        </div>
       </AppCard>
     </AppBackground>
+  );
+}
+
+function GenderList({ title, items, onRemove }) {
+  return (
+    <div>
+      <h3 style={{ color: "#1663a6", marginBottom: 8 }}>{title}</h3>
+      {items.length === 0 ? (
+        <p style={{ color: "#999", fontSize: 13 }}>Keine Einträge</p>
+      ) : (
+        items.map((item) => (
+          <div
+            key={item.id}
+            style={{
+              background: "#ffffff",
+              borderRadius: 8,
+              padding: "10px 12px",
+              marginBottom: 8,
+              boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              color: "#1663a6",
+              fontWeight: 600,
+              gap: 12,
+            }}
+          >
+            <span>{item.name}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* {item.gender && (
+                <span style={{ opacity: 0.7 }}>
+                  {item.gender === "m" ? "👦" : item.gender === "w" ? "👧" : "✨"}
+                </span>
+              )} */}
+              <button
+                onClick={() => onRemove?.(item.id)}
+                style={{
+                  background: "#ff4d4d",
+                  border: "none",
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  color: "white",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                X
+              </button>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+function TabButton({ active, label, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1,
+        padding: "10px 12px",
+        border: "none",
+        borderRadius: 10,
+        background: active ? "#4a90e2" : "#dbe9ff",
+        color: active ? "white" : "#1663a6",
+        fontSize: 16,
+        fontWeight: 600,
+        cursor: "pointer",
+      }}
+    >
+      {label}
+    </button>
   );
 }
