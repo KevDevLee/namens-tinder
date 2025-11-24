@@ -14,8 +14,9 @@ export default function StatsPage() {
   const { loading: authLoading, allowed } = useRoleGuard();
 
   useEffect(() => {
+    if (authLoading || !allowed) return;
     loadStats();
-  }, []);
+  }, [authLoading, allowed]);
 
   async function loadStats() {
     const [{ data: profileRows }, { data }] = await Promise.all([
@@ -25,8 +26,14 @@ export default function StatsPage() {
 
     if (!data || !profileRows) return;
 
-    const papaId = profileRows.find((row) => row.role === "papa")?.id;
-    const mamaId = profileRows.find((row) => row.role === "mama")?.id;
+    const roleMap = profileRows.reduce((acc, row) => {
+      const key = (row.role || "").toLowerCase();
+      acc[key] = row.id;
+      return acc;
+    }, {});
+
+    const papaId = roleMap.papa;
+    const mamaId = roleMap.mama;
 
     const makeCount = (userId, type) =>
       data.filter(

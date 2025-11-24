@@ -20,6 +20,8 @@ export default function StatsDetailsPage() {
   // Daten laden
   // ---------------------------------------------------
   useEffect(() => {
+    if (loading || !allowed) return;
+
     async function load() {
       const [{ data: profileRows }, { data: rows }] = await Promise.all([
         supabase.from("profiles").select("id, role"),
@@ -36,11 +38,16 @@ export default function StatsDetailsPage() {
         mama: { like: [], nope: [], maybe: [] },
       };
 
-      rows.forEach((r) => {
-        const profile = profileRows.find((p) => p.id === r.user_id);
-        if (!profile?.role) return;
+      const roleMap = profileRows.reduce((acc, row) => {
+        acc[row.id] = (row.role || "").toLowerCase();
+        return acc;
+      }, {});
 
-        structured[profile.role][r.decision].push({
+      rows.forEach((r) => {
+        const role = roleMap[r.user_id];
+        if (!role || !structured[role]) return;
+
+        structured[role][r.decision].push({
           id: r.id,
           user_id: r.user_id,
           name_id: r.name_id,
@@ -53,7 +60,7 @@ export default function StatsDetailsPage() {
     }
 
     load();
-  }, []);
+  }, [loading, allowed]);
 
   // ---------------------------------------------------
   // Löschen → Name wieder in Stapel

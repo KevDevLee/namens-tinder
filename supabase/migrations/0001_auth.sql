@@ -63,7 +63,7 @@ alter table public.decisions
   alter column user_id set not null;
 
 alter table public.decisions
-  drop column if exists user;
+  drop column if exists "user";
 
 alter table public.decisions enable row level security;
 
