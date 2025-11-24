@@ -63,6 +63,12 @@ function SwipeHerContent() {
   const [otherUserId, setOtherUserId] = useState(null);
   const current = names[index];
 
+  useEffect(() => {
+    x.set(0);
+    y.set(0);
+    controls.set({ x: 0, y: 0, rotate: 0, opacity: 1 });
+  }, [current?.id, controls, x, y]);
+
 
 
   // --------------------------------------------------
@@ -208,15 +214,31 @@ function SwipeHerContent() {
   // Drag-End Handler
   // --------------------------------------------------
   async function handleDragEnd(_, info) {
-    const xOffset = info.offset.x;
+    const { offset, velocity } = info;
+    const xOffset = offset.x;
+    const yOffset = offset.y;
 
-    if (xOffset > 100) return like();
-    if (xOffset < -100) return nope();
+    const fastRight = velocity.x > 600;
+    const fastLeft = velocity.x < -600;
+    const fastUp = velocity.y < -600;
+
+    if (xOffset > 30 || fastRight) {
+      return like();
+    }
+
+    if (xOffset < -30 || fastLeft) {
+      return nope();
+    }
+
+    if (yOffset < -40 || fastUp) {
+      return skip();
+    }
 
     controls.start({
       x: 0,
+      y: 0,
       rotate: 0,
-      transition: { type: "spring", stiffness: 260, damping: 22 }
+      transition: { type: "spring", stiffness: 260, damping: 22 },
     });
   }
 
@@ -282,11 +304,17 @@ function SwipeHerContent() {
 
         {/* SWIPE CARD */}
         <motion.div
-          drag="x"
+          key={current?.id || current?.name}
+          drag
+          dragConstraints={{ left: -5, right: 5, top: -5, bottom: 5 }}
+          dragElastic={0.05}
+          dragMomentum={false}
           animate={controls}
+          initial={{ x: 0, y: 0, rotate: 0, opacity: 1 }}
           onDragEnd={handleDragEnd}
           style={{
             x,
+            y,
             width: "100%",
             maxWidth: 260,
             height: 360,
