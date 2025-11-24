@@ -25,11 +25,8 @@ export default function Home() {
   const [lastName, setLastName] = useState("Lee");
   const { session, role, loading, signOut } = useSessionContext();
 
-  const [authMode, setAuthMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [selectedRole, setSelectedRole] = useState("papa");
-  const [authMessage, setAuthMessage] = useState("");
   const [authError, setAuthError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -67,38 +64,14 @@ export default function Home() {
     event.preventDefault();
     if (submitting) return;
     setAuthError("");
-    setAuthMessage("");
     setSubmitting(true);
 
     try {
-      if (authMode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { role: selectedRole },
-          },
-        });
-        if (error) throw error;
-
-        if (data.user) {
-          // Persist role mapping in profiles table for lookups
-          const { error: profileError } = await supabase
-            .from("profiles")
-            .upsert({ id: data.user.id, role: selectedRole });
-          if (profileError) throw profileError;
-        }
-
-        setAuthMessage(
-          "Registrierung erfolgreich! Du bist jetzt angemeldet."
-        );
-      }
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
     } catch (err) {
       setAuthError(err.message ?? "Unbekannter Fehler");
     } finally {
@@ -216,53 +189,8 @@ export default function Home() {
                 style={inputStyle}
               />
 
-              {authMode === "register" && (
-                <div style={{ display: "flex", gap: 12 }}>
-                  <label
-                    style={{
-                      display: "flex",
-                      gap: 8,
-                      alignItems: "center",
-                      flex: 1,
-                      justifyContent: "center",
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      value="papa"
-                      checked={selectedRole === "papa"}
-                      onChange={(e) => setSelectedRole(e.target.value)}
-                    />
-                    Papa
-                  </label>
-                  <label
-                    style={{
-                      display: "flex",
-                      gap: 8,
-                      alignItems: "center",
-                      flex: 1,
-                      justifyContent: "center",
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      value="mama"
-                      checked={selectedRole === "mama"}
-                      onChange={(e) => setSelectedRole(e.target.value)}
-                    />
-                    Mama
-                  </label>
-                </div>
-              )}
-
               {authError && (
                 <p style={{ color: "#d7263d", fontSize: 14 }}>{authError}</p>
-              )}
-
-              {authMessage && (
-                <p style={{ color: "#0f9d58", fontSize: 14 }}>
-                  {authMessage}
-                </p>
               )}
 
               <button
@@ -276,31 +204,9 @@ export default function Home() {
                   fontWeight: 700,
                 }}
               >
-                {submitting
-                  ? "Bitte warten…"
-                  : authMode === "login"
-                  ? "Einloggen"
-                  : "Registrieren"}
+                {submitting ? "Bitte warten…" : "Einloggen"}
               </button>
             </form>
-
-            <button
-              onClick={() =>
-                setAuthMode((prev) => (prev === "login" ? "register" : "login"))
-              }
-              style={{
-                background: "none",
-                border: "none",
-                color: "#1663a6",
-                fontSize: 14,
-                cursor: "pointer",
-                textDecoration: "underline",
-              }}
-            >
-              {authMode === "login"
-                ? "Neu hier? Jetzt registrieren."
-                : "Schon ein Konto? Hier einloggen."}
-            </button>
           </AppCard>
         </motion.div>
       </AppBackground>
