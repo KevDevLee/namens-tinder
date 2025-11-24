@@ -1,4 +1,10 @@
-export default function AppButton({ href, onClick, children, style = {} }) {
+export default function AppButton({
+  href,
+  onClick,
+  children,
+  style = {},
+  disabled = false,
+}) {
   const baseStyle = {
     background: "#4a90e2",
     color: "white",
@@ -22,7 +28,16 @@ export default function AppButton({ href, onClick, children, style = {} }) {
   }
 
   return (
-    <button onClick={onClick} style={{ ...baseStyle, ...style }}>
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        ...baseStyle,
+        opacity: disabled ? 0.5 : baseStyle.opacity,
+        cursor: disabled ? "not-allowed" : baseStyle.cursor,
+        ...style,
+      }}
+    >
       {children}
     </button>
   );

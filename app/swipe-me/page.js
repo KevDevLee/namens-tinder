@@ -32,6 +32,8 @@ function SwipeMeContent() {
   const { user, allowed, loading } = useRoleGuard("papa");
   const [names, setNames] = useState([]);
   const [index, setIndex] = useState(0);
+  const [history, setHistory] = useState([]);
+  const [showUndo, setShowUndo] = useState(false);
   const [showMatch, setShowMatch] = useState(false);
   const [matchName, setMatchName] = useState("");
 
@@ -127,6 +129,12 @@ function SwipeMeContent() {
   async function like() {
     if (!current) return;
 
+    setHistory((prev) => [
+      ...prev,
+      { nameId: current.id, decision: "like", index },
+    ]);
+    setShowUndo(true);
+
     await saveDecision("like");
 
     if (otherUserId) {
@@ -156,6 +164,14 @@ function SwipeMeContent() {
 
 
   async function nope() {
+    if (!current) return;
+
+    setHistory((prev) => [
+      ...prev,
+      { nameId: current.id, decision: "nope", index },
+    ]);
+    setShowUndo(true);
+
     await saveDecision("nope");
 
     await controls.start({
@@ -170,6 +186,14 @@ function SwipeMeContent() {
 
 
   async function skip() {
+    if (!current) return;
+
+    setHistory((prev) => [
+      ...prev,
+      { nameId: current.id, decision: "maybe", index },
+    ]);
+    setShowUndo(true);
+
     await saveDecision("maybe");
 
     await controls.start({
@@ -211,6 +235,26 @@ function SwipeMeContent() {
       rotate: 0,
       transition: { type: "spring", stiffness: 260, damping: 22 }
     });
+  }
+
+  async function undoLast() {
+    if (!user?.id || history.length === 0) return;
+    const last = history[history.length - 1];
+
+    await supabase
+      .from("decisions")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("name_id", last.nameId)
+      .eq("decision", last.decision);
+
+    setHistory((prev) => prev.slice(0, -1));
+    setShowMatch(false);
+    setIndex(last.index);
+    x.set(0);
+    y.set(0);
+    controls.set({ x: 0, y: 0, rotate: 0, opacity: 1 });
+    setShowUndo(false);
   }
 
 
@@ -375,22 +419,61 @@ function SwipeMeContent() {
         </motion.div>
 
 
-        <div style={{
-          display: "flex",
-          gap: 16,
-          width: "100%",
-          justifyContent: "center"
-        }}>
-          <AppButton onClick={nope} style={{ background: "#ff4d4d" }}>
-            Nope
-          </AppButton>
+        <div
+          style={{
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            alignItems: "center",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              width: "100%",
+              justifyContent: "center",
+              flexWrap: "nowrap",
+            }}
+          >
+            <AppButton
+              onClick={nope}
+              style={{ background: "#ff4d4d", flex: 1, minWidth: 0 }}
+            >
+              Nope
+            </AppButton>
 
-          <AppButton onClick={skip} style={{ background: "#b0b0b0" }}>
-            Maybe
-          </AppButton>
+            <AppButton
+              onClick={skip}
+              style={{ background: "#b0b0b0", flex: 1, minWidth: 0 }}
+            >
+              Maybe
+            </AppButton>
 
-          <AppButton onClick={like} style={{ background: "#4cd964" }}>
-            Like
+            <AppButton
+              onClick={like}
+              style={{ background: "#4cd964", flex: 1, minWidth: 0 }}
+            >
+              Like
+            </AppButton>
+          </div>
+
+          <AppButton
+            onClick={undoLast}
+            style={{
+              background: "#ffe7ba",
+              color: "#7a5200",
+              fontSize: 14,
+              padding: "8px 12px",
+              width: 120,
+              opacity: showUndo && history.length > 0 ? 0.5 : 0,
+              visibility: showUndo && history.length > 0 ? "visible" : "hidden",
+              pointerEvents: showUndo && history.length > 0 ? "auto" : "none",
+              transition: "opacity 0.2s ease",
+            }}
+          >
+            Undo
           </AppButton>
         </div>
 
