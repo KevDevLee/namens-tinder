@@ -363,6 +363,17 @@ export default function Home() {
             )}
 
             <AppButton
+              href="/my-decisions"
+              style={{
+                background: "#ffffff",
+                color: "#1663a6",
+                fontSize: 16,
+              }}
+            >
+              Meine Likes
+            </AppButton>
+
+            <AppButton
               href="/matches"
               style={{
                 background: "#cfe7ff",
@@ -371,17 +382,6 @@ export default function Home() {
               }}
             >
               Matches
-            </AppButton>
-
-            <AppButton
-              href="/stats"
-              style={{
-                background: "#ffffff",
-                color: "#1663a6",
-                fontSize: 16,
-              }}
-            >
-              Statistik
             </AppButton>
 
             <AppButton
