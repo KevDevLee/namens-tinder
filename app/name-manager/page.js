@@ -52,7 +52,14 @@ useEffect(() => {
 
   return (
     <AppBackground>
-      <AppCard style={{ paddingBottom: 40 }}>
+      <AppCard
+        style={{
+          paddingBottom: 40,
+          maxHeight: "90vh",
+          overflow: "hidden",
+          width: "100%",
+        }}
+      >
         <BackButton />
 
         <h1
@@ -153,9 +160,11 @@ useEffect(() => {
         {/* NAME LIST (scrollable) */}
         <div
           style={{
-            maxHeight: "55vh",
+            flex: 1,
+            maxHeight: "50vh",
             overflowY: "auto",
             paddingRight: 4,
+            width: "100%",
           }}
         >
           {filteredNames.length === 0 ? (
