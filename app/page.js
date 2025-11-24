@@ -365,9 +365,9 @@ export default function Home() {
             <AppButton
               href="/my-decisions"
               style={{
-                background: "#ffffff",
-                color: "#1663a6",
-                fontSize: 16,
+                background: "#7ab6ff",
+                color: "#ffffff",
+                fontSize: 21,
               }}
             >
               Meine Likes
@@ -394,7 +394,7 @@ export default function Home() {
                 marginTop: 6,
               }}
             >
-              🔧 Namensmanager
+              Namensmanager
             </AppButton>
           </motion.div>
 
