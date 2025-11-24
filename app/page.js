@@ -7,6 +7,7 @@ import AppButton from "./components/AppButton";
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useSessionContext } from "./providers/SupabaseSessionProvider";
+import { getProfileIdByRole } from "./utils/getProfileIdByRole";
 
 const inputStyle = {
   width: "100%",
@@ -31,6 +32,8 @@ export default function Home() {
   const [authMessage, setAuthMessage] = useState("");
   const [authError, setAuthError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const [matchesCount, setMatchesCount] = useState(null);
 
   // Hydration-Fix → verhindert SSR-Fehler
   useEffect(() => {
@@ -102,6 +105,49 @@ export default function Home() {
       setSubmitting(false);
     }
   }
+
+  useEffect(() => {
+    if (!session?.user?.id || !role) {
+      setMatchesCount(null);
+      return;
+    }
+
+    async function loadMatchesCount() {
+      try {
+        const otherRole = role === "papa" ? "mama" : "papa";
+        const otherUserId = await getProfileIdByRole(otherRole);
+        if (!otherUserId) {
+          setMatchesCount(0);
+          return;
+        }
+
+        const [{ data: myLikes }, { data: otherLikes }] = await Promise.all([
+          supabase
+            .from("decisions")
+            .select("name_id")
+            .eq("user_id", session.user.id)
+            .eq("decision", "like"),
+          supabase
+            .from("decisions")
+            .select("name_id")
+            .eq("user_id", otherUserId)
+            .eq("decision", "like"),
+        ]);
+
+        const myIds = new Set((myLikes || []).map((row) => row.name_id));
+        const shared = (otherLikes || [])
+          .map((row) => row.name_id)
+          .filter((id) => myIds.has(id));
+
+        setMatchesCount(shared.length);
+      } catch (err) {
+        console.error("loadMatchesCount error:", err);
+        setMatchesCount(0);
+      }
+    }
+
+    loadMatchesCount();
+  }, [session?.user?.id, role]);
 
   // verhindert SSR mismatch
   if (!hydrated || loading) {
@@ -381,7 +427,7 @@ export default function Home() {
                 marginTop: 10,
               }}
             >
-              Matches
+              Matches{matchesCount !== null ? ` (${matchesCount})` : ""}
             </AppButton>
 
             <AppButton
