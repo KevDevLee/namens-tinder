@@ -21,7 +21,7 @@ export default function StatsPage() {
   async function loadStats() {
     const [{ data: profileRows }, { data }] = await Promise.all([
       supabase.from("profiles").select("id, role"),
-      supabase.from("decisions").select("user_id, decision"),
+      supabase.from("decisions").select("id, user_id, decision, name_id").order("id"),
     ]);
 
     if (!data || !profileRows) return;
@@ -35,10 +35,22 @@ export default function StatsPage() {
     const papaId = roleMap.papa;
     const mamaId = roleMap.mama;
 
-    const makeCount = (userId, type) =>
-      data.filter(
-        (d) => d.user_id === userId && d.decision === type
-      ).length;
+    const latestPerUserName = new Map();
+    data.forEach((row) => {
+      const key = `${row.user_id}-${row.name_id}`;
+      const existing = latestPerUserName.get(key);
+      if (!existing || row.id > existing.id) {
+        latestPerUserName.set(key, row);
+      }
+    });
+
+    const makeCount = (userId, type) => {
+      let count = 0;
+      latestPerUserName.forEach((row) => {
+        if (row.user_id === userId && row.decision === type) count += 1;
+      });
+      return count;
+    };
 
     setStats({
       papa: {
