@@ -65,6 +65,14 @@ export default function StatsDetailsPage() {
         });
       });
 
+      Object.keys(structured).forEach((role) => {
+        ["like", "maybe", "nope"].forEach((cat) => {
+          structured[role][cat].sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+          );
+        });
+      });
+
       setData(structured);
     }
 

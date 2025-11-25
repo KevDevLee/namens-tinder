@@ -53,6 +53,12 @@ export default function MyDecisionsPage() {
           });
         });
 
+        Object.keys(grouped).forEach((key) => {
+          grouped[key].sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+          );
+        });
+
         setEntries(grouped);
       }
 
