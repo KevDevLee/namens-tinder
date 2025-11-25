@@ -31,6 +31,7 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
 
   const [matchesCount, setMatchesCount] = useState(null);
+  const [maybeCount, setMaybeCount] = useState(null);
 
   // Hydration-Fix → verhindert SSR-Fehler
   useEffect(() => {
@@ -82,6 +83,7 @@ export default function Home() {
   useEffect(() => {
     if (!session?.user?.id || !role) {
       setMatchesCount(null);
+      setMaybeCount(null);
       return;
     }
 
@@ -91,31 +93,64 @@ export default function Home() {
         const otherUserId = await getProfileIdByRole(otherRole);
         if (!otherUserId) {
           setMatchesCount(0);
+          setMaybeCount(0);
           return;
         }
 
-        const [{ data: myLikes }, { data: otherLikes }] = await Promise.all([
+        const fetchDecisions = (userId) =>
           supabase
             .from("decisions")
-            .select("name_id")
-            .eq("user_id", session.user.id)
-            .eq("decision", "like"),
-          supabase
-            .from("decisions")
-            .select("name_id")
-            .eq("user_id", otherUserId)
-            .eq("decision", "like"),
+            .select("id, name_id, decision")
+            .eq("user_id", userId)
+            .order("id", { ascending: false });
+
+        const [{ data: myRows }, { data: otherRows }] = await Promise.all([
+          fetchDecisions(session.user.id),
+          fetchDecisions(otherUserId),
         ]);
 
-        const myIds = new Set((myLikes || []).map((row) => row.name_id));
-        const shared = (otherLikes || [])
-          .map((row) => row.name_id)
-          .filter((id) => myIds.has(id));
+        const latestMap = (rows) => {
+          const map = new Map();
+          (rows || []).forEach((row) => {
+            if (!map.has(row.name_id)) {
+              map.set(row.name_id, row.decision);
+            }
+          });
+          return map;
+        };
 
-        setMatchesCount(shared.length);
+        const myLatest = latestMap(myRows);
+        const otherLatest = latestMap(otherRows);
+
+        const allIds = new Set([
+          ...myLatest.keys(),
+          ...otherLatest.keys(),
+        ]);
+
+        let confirmed = 0;
+        let maybe = 0;
+
+        allIds.forEach((nameId) => {
+          const mine = myLatest.get(nameId);
+          const other = otherLatest.get(nameId);
+
+          if (mine === "like" && other === "like") {
+            confirmed += 1;
+          } else if (
+            (mine === "like" && other === "maybe") ||
+            (mine === "maybe" && other === "like") ||
+            (mine === "maybe" && other === "maybe")
+          ) {
+            maybe += 1;
+          }
+        });
+
+        setMatchesCount(confirmed);
+        setMaybeCount(maybe);
       } catch (err) {
         console.error("loadMatchesCount error:", err);
         setMatchesCount(0);
+        setMaybeCount(0);
       }
     }
 
@@ -333,7 +368,25 @@ export default function Home() {
                 marginTop: 10,
               }}
             >
-              Matches{matchesCount !== null ? ` (${matchesCount})` : ""}
+              Matches
+              {matchesCount !== null ? (
+                <span style={{ fontWeight: 700 }}>{` (${matchesCount})`}</span>
+              ) : (
+                ""
+              )}
+              {maybeCount !== null ? (
+                <span
+                  style={{
+                    marginLeft: 4,
+                    fontSize: 14,
+                    opacity: 0.4,
+                  }}
+                >
+                  {`/${maybeCount}`}
+                </span>
+              ) : (
+                ""
+              )}
             </AppButton>
 
             <AppButton
