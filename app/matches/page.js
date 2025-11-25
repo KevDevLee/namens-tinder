@@ -11,6 +11,7 @@ import { getProfileIdByRole } from "../utils/getProfileIdByRole";
 
 export default function MatchesPage() {
   const [matches, setMatches] = useState([]);
+  const [maybeMatches, setMaybeMatches] = useState([]);
   const [loadingMatches, setLoadingMatches] = useState(true);
   const { user, role, loading, allowed } = useRoleGuard();
 
@@ -24,29 +25,61 @@ export default function MatchesPage() {
         const otherRole = role === "papa" ? "mama" : "papa";
         const otherUserId = await getProfileIdByRole(otherRole);
 
-        const [{ data: myDecisions }, { data: otherDecisions }] =
-          await Promise.all([
-            supabase
-              .from("decisions")
-              .select("name_id")
-              .eq("user_id", user.id)
-              .eq("decision", "like"),
-            otherUserId
-              ? supabase
-                  .from("decisions")
-                  .select("name_id")
-                  .eq("user_id", otherUserId)
-                  .eq("decision", "like")
-              : Promise.resolve({ data: [] }),
-          ]);
+        const fetchDecisions = (userId) =>
+          userId
+            ? supabase
+                .from("decisions")
+                .select("id, name_id, decision")
+                .eq("user_id", userId)
+                .order("id", { ascending: false })
+            : Promise.resolve({ data: [] });
 
-        const myLikes = new Set((myDecisions || []).map((row) => row.name_id));
-        const shared = (otherDecisions || [])
-          .map((row) => row.name_id)
-          .filter((id) => myLikes.has(id));
+        const [{ data: myRows }, { data: otherRows }] = await Promise.all([
+          fetchDecisions(user.id),
+          fetchDecisions(otherUserId),
+        ]);
 
-        if (shared.length === 0) {
+        const latestByName = (rows) => {
+          const map = new Map();
+          (rows || []).forEach((row) => {
+            if (!map.has(row.name_id)) {
+              map.set(row.name_id, row.decision);
+            }
+          });
+          return map;
+        };
+
+        const myLatest = latestByName(myRows);
+        const otherLatest = latestByName(otherRows);
+
+        const allNameIds = new Set([
+          ...myLatest.keys(),
+          ...otherLatest.keys(),
+        ]);
+
+        const confirmedMatches = [];
+        const maybeCandidates = [];
+
+        allNameIds.forEach((nameId) => {
+          const myDecision = myLatest.get(nameId);
+          const otherDecision = otherLatest.get(nameId);
+
+          if (myDecision === "like" && otherDecision === "like") {
+            confirmedMatches.push(nameId);
+          } else if (
+            (myDecision === "like" && otherDecision === "maybe") ||
+            (myDecision === "maybe" && otherDecision === "like") ||
+            (myDecision === "maybe" && otherDecision === "maybe")
+          ) {
+            maybeCandidates.push(nameId);
+          }
+        });
+
+        const combinedIds = [...new Set([...confirmedMatches, ...maybeCandidates])];
+
+        if (combinedIds.length === 0) {
           setMatches([]);
+          setMaybeMatches([]);
           setLoadingMatches(false);
           return;
         }
@@ -54,10 +87,21 @@ export default function MatchesPage() {
         const { data: names } = await supabase
           .from("names")
           .select("*")
-          .in("id", shared)
+          .in("id", combinedIds)
           .order("name");
 
-        setMatches(names || []);
+        const nameMap = new Map((names || []).map((n) => [n.id, n]));
+
+        setMatches(
+          confirmedMatches
+            .map((id) => nameMap.get(id))
+            .filter(Boolean)
+        );
+        setMaybeMatches(
+          maybeCandidates
+            .map((id) => nameMap.get(id))
+            .filter(Boolean)
+        );
       } catch (err) {
         console.error("loadMatches error:", err);
         setMatches([]);
@@ -104,7 +148,7 @@ export default function MatchesPage() {
           >
             Lade Matches…
           </p>
-        ) : matches.length === 0 ? (
+        ) : matches.length === 0 && maybeMatches.length === 0 ? (
           <p
             style={{
               color: "#1663a6",
@@ -117,33 +161,101 @@ export default function MatchesPage() {
             Noch keine gemeinsamen Likes.
           </p>
         ) : (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              width: "100%",
-              gap: 12,
-              marginTop: 10,
-            }}
-          >
-            {matches.map((m) => (
-              <div
-                key={m.id}
-                style={{
-                  background: "linear-gradient(120deg, #e8f3ff 0%, #ffffff 100%)",
-                  padding: "14px 18px",
-                  borderRadius: 14,
-                  fontSize: 20,
-                  fontWeight: 700,
-                  color: "#1663a6",
-                  boxShadow: "0 6px 14px rgba(0,0,0,0.15)",
-                  textAlign: "center",
-                }}
-              >
-                {m.name}
-              </div>
-            ))}
-          </div>
+          <>
+            {matches.length > 0 && (
+              <>
+                <h2
+                  style={{
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: "#1663a6",
+                    marginTop: 10,
+                    textAlign: "center",
+                  }}
+                >
+                  Gemeinsame Likes
+                </h2>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    width: "100%",
+                    gap: 12,
+                    marginTop: 10,
+                  }}
+                >
+                  {matches.map((m) => (
+                    <div
+                      key={m.id}
+                      style={{
+                        background: "linear-gradient(120deg, #e8f3ff 0%, #ffffff 100%)",
+                        padding: "14px 18px",
+                        borderRadius: 14,
+                        fontSize: 20,
+                        fontWeight: 700,
+                        color: "#1663a6",
+                        boxShadow: "0 6px 14px rgba(0,0,0,0.15)",
+                        textAlign: "center",
+                      }}
+                    >
+                      {m.name}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {maybeMatches.length > 0 && (
+              <>
+                <h2
+                  style={{
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: "#1663a6",
+                    marginTop: 20,
+                    textAlign: "center",
+                  }}
+                >
+                  Offene Favoriten
+                </h2>
+                <p
+                  style={{
+                    color: "#4a4a4a",
+                    textAlign: "center",
+                    marginBottom: 10,
+                  }}
+                >
+                  Einer hat „Like“ und der andere „Maybe“ – oder beide „Maybe“.
+                </p>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    width: "100%",
+                    gap: 12,
+                  }}
+                >
+                  {maybeMatches.map((m) => (
+                    <div
+                      key={m.id}
+                      style={{
+                        background: "linear-gradient(120deg, #fff5e5 0%, #ffe7c7 100%)",
+                        padding: "14px 18px",
+                        borderRadius: 14,
+                        fontSize: 20,
+                        fontWeight: 700,
+                        color: "#7a5200",
+                        boxShadow: "0 6px 14px rgba(0,0,0,0.15)",
+                        textAlign: "center",
+                      }}
+                    >
+                      {m.name}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </>
         )}
       </AppCard>
     </AppBackground>
