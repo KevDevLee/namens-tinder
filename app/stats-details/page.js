@@ -43,7 +43,16 @@ export default function StatsDetailsPage() {
         return acc;
       }, {});
 
-      rows.forEach((r) => {
+      const latestPerUserName = new Map();
+      rows.forEach((row) => {
+        const key = `${row.user_id}-${row.name_id}`;
+        const existing = latestPerUserName.get(key);
+        if (!existing || row.id > existing.id) {
+          latestPerUserName.set(key, row);
+        }
+      });
+
+      latestPerUserName.forEach((r) => {
         const role = roleMap[r.user_id];
         if (!role || !structured[role]) return;
 

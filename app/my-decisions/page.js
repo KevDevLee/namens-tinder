@@ -30,13 +30,20 @@ export default function MyDecisionsPage() {
       setBusy(true);
       const { data, error } = await supabase
         .from("decisions")
-        .select("id, decision, names(name, gender)")
+        .select("id, name_id, decision, names(name, gender)")
         .eq("user_id", user.id)
         .order("id", { ascending: false });
 
       if (!error && data) {
-        const grouped = { like: [], maybe: [], nope: [] };
+        const latestByName = new Map();
         data.forEach((row) => {
+          if (!latestByName.has(row.name_id)) {
+            latestByName.set(row.name_id, row);
+          }
+        });
+
+        const grouped = { like: [], maybe: [], nope: [] };
+        latestByName.forEach((row) => {
           const decision = row.decision;
           if (!grouped[decision]) grouped[decision] = [];
           grouped[decision].push({
@@ -45,6 +52,7 @@ export default function MyDecisionsPage() {
             gender: row.names?.gender || null,
           });
         });
+
         setEntries(grouped);
       }
 
