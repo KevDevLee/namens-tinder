@@ -121,7 +121,6 @@ function SwipeHerContent() {
     x.set(0);
     y.set(0);
     controls.set({ x: 0, y: 0, rotate: 0, opacity: 1 });
-    setShowUndo(false);
   }
 
 
