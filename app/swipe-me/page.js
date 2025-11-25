@@ -398,21 +398,6 @@ function SwipeMeContent() {
           >
             Nein ✖️
           </motion.div>
-          {current?.gender && (
-            <span
-              style={{
-                position: "absolute",
-                top: 8,
-                right: 12,
-                color: "white",
-                fontSize: 14,
-                fontWeight: 600,
-              }}
-            >
-              {/* {current.gender === "m" ? "👦" : "👧"} */}
-            </span>
-          )}
-
           <div style={{ textAlign: "center" }}>
             <div>{current.name} {lastName}</div>
           </div>
@@ -461,16 +446,13 @@ function SwipeMeContent() {
 
           <AppButton
             onClick={undoLast}
+            disabled={!showUndo || history.length === 0}
             style={{
               background: "#ffe7ba",
               color: "#7a5200",
               fontSize: 14,
               padding: "8px 12px",
               width: 120,
-              opacity: showUndo && history.length > 0 ? 0.5 : 0,
-              visibility: showUndo && history.length > 0 ? "visible" : "hidden",
-              pointerEvents: showUndo && history.length > 0 ? "auto" : "none",
-              transition: "opacity 0.2s ease",
             }}
           >
             Undo
