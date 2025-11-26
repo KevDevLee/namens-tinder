@@ -97,14 +97,37 @@ export default function Home() {
           return;
         }
 
-        const fetchDecisions = (userId) =>
-          supabase
-            .from("decisions")
-            .select("id, name_id, decision")
-            .eq("user_id", userId)
-            .order("id", { ascending: false });
+        const fetchDecisions = async (userId) => {
+          const pageSize = 1000;
+          let all = [];
+          let from = 0;
 
-        const [{ data: myRows }, { data: otherRows }] = await Promise.all([
+          while (true) {
+            const { data, error } = await supabase
+              .from("decisions")
+              .select("id, name_id, decision")
+              .eq("user_id", userId)
+              .order("id", { ascending: false })
+              .range(from, from + pageSize - 1);
+
+            if (error) {
+              console.error("matches count decisions error:", error);
+              break;
+            }
+
+            if (!data || data.length === 0) break;
+
+            all = all.concat(data);
+
+            if (data.length < pageSize) break;
+
+            from += pageSize;
+          }
+
+          return all;
+        };
+
+        const [myRows, otherRows] = await Promise.all([
           fetchDecisions(session.user.id),
           fetchDecisions(otherUserId),
         ]);
