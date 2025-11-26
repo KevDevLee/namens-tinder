@@ -60,6 +60,7 @@ function SwipeMeContent() {
   );
 
   const horizontalThreshold = 120;
+  const highlightThreshold = 95;
   const [pendingDecision, setPendingDecision] = useState(null);
   const isDraggingRef = useRef(false);
 
@@ -76,13 +77,13 @@ function SwipeMeContent() {
   useEffect(() => {
     const unsubscribe = x.on("change", (latest) => {
       if (!isDraggingRef.current) {
-        setPendingDecision((prev) => (prev ? null : prev));
+        setPendingDecision(null);
         return;
       }
 
       let next = null;
-      if (latest > horizontalThreshold) next = "like";
-      else if (latest < -horizontalThreshold) next = "nope";
+      if (latest > highlightThreshold) next = "like";
+      else if (latest < -highlightThreshold) next = "nope";
 
       setPendingDecision((prev) => (prev === next ? prev : next));
     });
@@ -238,29 +239,34 @@ function SwipeMeContent() {
 
 
   async function handleDragEnd(_, info) {
-    isDraggingRef.current = false;
-    setPendingDecision(null);
-
     const { offset, velocity } = info;
     const xOffset = offset.x;
     const yOffset = offset.y;
 
-    const fastRight = velocity.x > 1000;
-    const fastLeft = velocity.x < -1000;
     const fastUp = velocity.y < -1000;
 
-    if ((xOffset > 120 && yOffset > -80 && yOffset < 80) || fastRight) {
+    const withinHorizontalBand = yOffset > -80 && yOffset < 80;
+
+    if (withinHorizontalBand && xOffset > horizontalThreshold) {
+      isDraggingRef.current = false;
+      setPendingDecision(null);
       return like();
     }
 
-    if ((xOffset < -120 && yOffset > -80 && yOffset < 80) || fastLeft) {
+    if (withinHorizontalBand && xOffset < -horizontalThreshold) {
+      isDraggingRef.current = false;
+      setPendingDecision(null);
       return nope();
     }
 
     if (yOffset < -140 || fastUp) {
+      isDraggingRef.current = false;
+      setPendingDecision(null);
       return skip();
     }
 
+    isDraggingRef.current = false;
+    setPendingDecision(null);
     controls.start({
       x: 0,
       y: 0,
