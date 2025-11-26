@@ -6,6 +6,7 @@ import { supabase } from "../../lib/supabaseClient";
 import AppBackground from "../components/AppBackground";
 import AppCard from "../components/AppCard";
 import BackButton from "../components/BackButton";
+import HomeButton from "../components/HomeButton";
 import AppButton from "../components/AppButton";
 import { useRoleGuard } from "../hooks/useRoleGuard";
 
@@ -106,16 +107,16 @@ export default function StatsPage() {
   return (
     <AppBackground>
       <AppCard
-  style={{
-    paddingBottom: 40,
-    textAlign: "center",
-    color: "#1663a6",
-    fontWeight: 600,
-    position: "relative",     // <-- HINZUGEFÜGT
-  }}
->
-  <BackButton />
-
+        style={{
+          paddingBottom: 40,
+          textAlign: "center",
+          color: "#1663a6",
+          fontWeight: 600,
+          position: "relative",
+        }}
+      >
+        <BackButton />
+        <HomeButton />
 
         <h1
           style={{

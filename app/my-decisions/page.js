@@ -136,6 +136,7 @@ export default function MyDecisionsPage() {
           width: "100%",
           maxHeight: "90vh",
           overflow: "hidden",
+          position: "relative",
         }}
       >
         <BackButton />

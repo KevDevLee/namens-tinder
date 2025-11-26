@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion, useAnimation } from "framer-motion";
+import { AnimatePresence, motion, useAnimation } from "framer-motion";
 import { supabase } from "../../lib/supabaseClient";
 import AppBackground from "../components/AppBackground";
 import { fetchAllNames } from "../utils/fetchAllNames";
@@ -198,6 +198,7 @@ export default function NameManagerPage() {
           maxHeight: "90vh",
           overflow: "hidden",
           width: "100%",
+          position: "relative",
         }}
       >
         <BackButton />
@@ -346,11 +347,12 @@ export default function NameManagerPage() {
               Keine Namen gefunden.
             </p>
           ) : (
-            filteredNames.map((n) => {
-              const status = decisionMap[n.id] || "open";
-              const statusStyle = decisionStatusStyles[status];
-              const isOpen = status === "open";
-              const canSwipe = showOnlyOpen && isOpen;
+            <AnimatePresence presenceAffectsLayout>
+              {filteredNames.map((n) => {
+                const status = decisionMap[n.id] || "open";
+                const statusStyle = decisionStatusStyles[status];
+                const isOpen = status === "open";
+                const canSwipe = showOnlyOpen && isOpen;
 
               return (
                 <NameListRow
@@ -363,9 +365,15 @@ export default function NameManagerPage() {
                   dragActiveRef={dragActiveRef}
                   onSelect={() => setSelectedName(n)}
                   onSwipeDecision={(decision) => handleDecision(decision, n)}
+                  onQuickDecision={
+                    isOpen
+                      ? (decision) => handleDecision(decision, n)
+                      : undefined
+                  }
                 />
               );
-            })
+              })}
+            </AnimatePresence>
           )}
         </div>
 
@@ -407,6 +415,7 @@ function NameListRow({
   dragActiveRef,
   onSelect,
   onSwipeDecision,
+  onQuickDecision,
 }) {
   const controls = useAnimation();
   const pendingRef = useRef(null);
@@ -427,6 +436,8 @@ function NameListRow({
 
   return (
     <motion.div
+      layout
+      layoutId={`name-${nameData.id}`}
       role="button"
       tabIndex={0}
       onClick={() => {
@@ -440,6 +451,7 @@ function NameListRow({
         }
       }}
       animate={controls}
+      exit={{ x: 220, opacity: 0 }}
       style={{
         display: "flex",
         justifyContent: "space-between",
@@ -457,6 +469,9 @@ function NameListRow({
       dragConstraints={canSwipe ? { left: -120, right: 120 } : undefined}
       dragElastic={0.2}
       dragMomentum={false}
+      transition={{
+        layout: { type: "spring", stiffness: 400, damping: 32 },
+      }}
       whileTap={{ scale: canSwipe ? 0.98 : 1 }}
       onDrag={(event, info) => {
         if (!canSwipe) return;
@@ -506,42 +521,96 @@ function NameListRow({
         });
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <span style={{ fontSize: 16, fontWeight: 600, color: "#1663a6" }}>
-          {nameData.name}
-        </span>
-        <span
-          style={{
-            alignSelf: "flex-start",
-            padding: "2px 8px",
-            borderRadius: 999,
-            fontSize: 11,
-            fontWeight: 700,
-            background: statusStyle.bg,
-            color: statusStyle.color,
-          }}
-        >
-          {statusStyle.label}
-        </span>
-      </div>
-
-      <span
+      <div
         style={{
-          padding: "4px 8px",
-          borderRadius: 8,
-          fontSize: 12,
-          fontWeight: 700,
-          color: "white",
-          background:
-            nameData.gender === "m"
-              ? "#4a90e2"
-              : nameData.gender === "w"
-              ? "#ff8dcf"
-              : "#aaa",
+          display: "flex",
+          alignItems: "center",
+          flex: 1,
+          gap: 12,
         }}
       >
-        {nameData.gender === "m" ? "J" : nameData.gender === "w" ? "M" : "?"}
-      </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ fontSize: 16, fontWeight: 600, color: "#1663a6" }}>
+            {nameData.name}
+          </span>
+          <span
+            style={{
+              alignSelf: "flex-start",
+              padding: "2px 8px",
+              borderRadius: 999,
+              fontSize: 11,
+              fontWeight: 700,
+              background: statusStyle.bg,
+              color: statusStyle.color,
+            }}
+          >
+            {statusStyle.label}
+          </span>
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+          alignItems: "flex-end",
+        }}
+      >
+        <span
+          style={{
+            padding: "4px 8px",
+            borderRadius: 8,
+            fontSize: 12,
+            fontWeight: 700,
+            color: "white",
+            background:
+              nameData.gender === "m"
+                ? "#4a90e2"
+                : nameData.gender === "w"
+                ? "#ff8dcf"
+                : "#aaa",
+          }}
+        >
+          {nameData.gender === "m" ? "J" : nameData.gender === "w" ? "M" : "?"}
+        </span>
+
+        {isOpen && onQuickDecision && (
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              alignItems: "center",
+            }}
+          >
+            {quickActions.map((action) => (
+              <button
+                key={action.type}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onQuickDecision(action.type);
+                }}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  border: "none",
+                  background: action.bg,
+                  color: action.color,
+                  fontWeight: 700,
+                  fontSize: 16,
+                  cursor: "pointer",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                }}
+                aria-label={action.label}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </motion.div>
   );
 }
@@ -550,6 +619,12 @@ const swipeHighlight = {
   like: "rgba(53,178,127,0.18)",
   nope: "rgba(224,93,93,0.25)",
 };
+
+const quickActions = [
+  { type: "nope", label: "✕", bg: "#ffe3e3", color: "#bd2d2d" },
+  { type: "maybe", label: "?", bg: "#fff4d6", color: "#b17000" },
+  { type: "like", label: "✓", bg: "#dff8ec", color: "#1e7a57" },
+];
 
 const decisionStyles = {
   like: {
