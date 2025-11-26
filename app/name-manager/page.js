@@ -1,38 +1,177 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { motion, useAnimation } from "framer-motion";
 import { supabase } from "../../lib/supabaseClient";
 import AppBackground from "../components/AppBackground";
-import { fetchAllNames } from "../utils/fetchAllNames"; 
+import { fetchAllNames } from "../utils/fetchAllNames";
 import AppCard from "../components/AppCard";
 import BackButton from "../components/BackButton";
 import AppButton from "../components/AppButton";
-import Link from "next/link";
+import { useRoleGuard } from "../hooks/useRoleGuard";
 
 export default function NameManagerPage() {
+  const { user, loading: authLoading, allowed } = useRoleGuard();
   const [names, setNames] = useState([]);
   const [letter, setLetter] = useState("ALL");
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState("asc"); // "asc" | "desc"
+  const [selectedName, setSelectedName] = useState(null);
+  const [decisionMap, setDecisionMap] = useState({});
+  const [actionBusy, setActionBusy] = useState(false);
+  const [showOnlyOpen, setShowOnlyOpen] = useState(false);
+  const dragActiveRef = useRef(false);
 
   const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
   // ----------------------------------------
   // LOAD NAMES
   // ----------------------------------------
-useEffect(() => {
-  async function load() {
-    const all = await fetchAllNames("all");
-    setNames(all);
+  useEffect(() => {
+    if (authLoading || !allowed) return;
+
+    let cancelled = false;
+
+    async function load() {
+      const all = await fetchAllNames("all");
+      if (!cancelled) setNames(all);
+    }
+
+    load();
+
+    const reload = localStorage.getItem("reload-names");
+    if (reload) {
+      load().then(() => localStorage.removeItem("reload-names"));
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, allowed]);
+
+  // ----------------------------------------
+  // LOAD DECISIONS
+  // ----------------------------------------
+  useEffect(() => {
+    if (authLoading || !allowed || !user?.id) return;
+
+    let cancelled = false;
+
+    async function loadAllDecisions() {
+      const pageSize = 1000;
+      let from = 0;
+      const latest = {};
+
+      while (true) {
+        const { data, error } = await supabase
+          .from("decisions")
+          .select("id, name_id, decision")
+          .eq("user_id", user.id)
+          .order("id", { ascending: false })
+          .range(from, from + pageSize - 1);
+
+        if (error) {
+          console.error("name-manager decisions load error:", error);
+          break;
+        }
+
+        if (!data || data.length === 0) break;
+
+        for (const entry of data) {
+          if (!latest[entry.name_id]) {
+            latest[entry.name_id] = entry.decision;
+          }
+        }
+
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+
+      if (!cancelled) {
+        setDecisionMap(latest);
+      }
+    }
+
+    loadAllDecisions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, allowed, user?.id]);
+
+  // Close modal on ESC
+  useEffect(() => {
+    if (!selectedName) return;
+
+    function handleKey(e) {
+      if (e.key === "Escape") {
+        setSelectedName(null);
+      }
+    }
+
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [selectedName]);
+
+  const swipeThreshold = 80;
+
+  async function handleDecision(decision, targetName = selectedName) {
+    if (!targetName || !user?.id) return;
+    if (decisionMap[targetName.id] === decision) return;
+
+    setActionBusy(true);
+
+    const { error } = await supabase
+      .from("decisions")
+      .upsert(
+        {
+          user_id: user.id,
+          name_id: targetName.id,
+          decision,
+        },
+        { onConflict: "user_id,name_id" }
+      );
+
+    if (error) {
+      console.error("save decision error:", error);
+    } else {
+      setDecisionMap((prev) => ({
+        ...prev,
+        [targetName.id]: decision,
+      }));
+    }
+
+    setActionBusy(false);
   }
 
-  load();
+  async function handleClearDecision(targetName = selectedName) {
+    if (!targetName || !user?.id) return;
+    if (!decisionMap[targetName.id]) return;
 
-  const reload = localStorage.getItem("reload-names");
-  if (reload) {
-    load().then(() => localStorage.removeItem("reload-names"));
+    setActionBusy(true);
+
+    const { error } = await supabase
+      .from("decisions")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("name_id", targetName.id);
+
+    if (error) {
+      console.error("delete decision error:", error);
+    } else {
+      setDecisionMap((prev) => {
+        const next = { ...prev };
+        delete next[targetName.id];
+        return next;
+      });
+    }
+
+    setActionBusy(false);
   }
-}, []);
+
+  if (authLoading || !allowed) {
+    return <AppBackground>Loading…</AppBackground>;
+  }
 
   // ----------------------------------------
   // FILTER + SEARCH + SORT
@@ -43,6 +182,7 @@ useEffect(() => {
         return false;
       if (search.trim() !== "" && !n.name.toLowerCase().includes(search.toLowerCase()))
         return false;
+      if (showOnlyOpen && decisionMap[n.id]) return false;
       return true;
     })
     .sort((a, b) => {
@@ -92,13 +232,40 @@ useEffect(() => {
           />
         </div>
 
-        {/* SORT BUTTON */}
-        <div style={{ textAlign: "right", marginBottom: 10 }}>
+        {/* SORT + OPEN FILTER */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 8,
+            marginBottom: 10,
+            flexWrap: "wrap",
+          }}
+        >
+          <button
+            onClick={() => setShowOnlyOpen((prev) => !prev)}
+            style={{
+              flex: 1,
+              minWidth: 140,
+              padding: "6px 10px",
+              borderRadius: 8,
+              border: "none",
+              background: showOnlyOpen ? "#35b27f" : "#e3efff",
+              color: showOnlyOpen ? "white" : "#1663a6",
+              fontWeight: 600,
+              fontSize: 14,
+            }}
+          >
+            {showOnlyOpen ? "Nur offene (an)" : "Nur offene"}
+          </button>
+
           <button
             onClick={() =>
               setSortOrder(sortOrder === "asc" ? "desc" : "asc")
             }
             style={{
+              flex: 1,
+              minWidth: 140,
               padding: "6px 10px",
               borderRadius: 8,
               border: "none",
@@ -179,42 +346,26 @@ useEffect(() => {
               Keine Namen gefunden.
             </p>
           ) : (
-            filteredNames.map((n) => (
-              <div
-                key={n.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  background: "white",
-                  padding: "10px 12px",
-                  marginBottom: 6,
-                  borderRadius: 8,
-                  border: "1px solid #dce7f7",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-                }}
-              >
-                {/* Name */}
-                <span style={{ fontSize: 16, fontWeight: 600, color: "#1663a6" }}>
-                  {n.name}
-                </span>
+            filteredNames.map((n) => {
+              const status = decisionMap[n.id] || "open";
+              const statusStyle = decisionStatusStyles[status];
+              const isOpen = status === "open";
+              const canSwipe = showOnlyOpen && isOpen;
 
-                {/* Gender Badge */}
-                <span
-                  style={{
-                    padding: "4px 8px",
-                    borderRadius: 8,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: "white",
-                    background:
-                      n.gender === "m" ? "#4a90e2" : n.gender === "w" ? "#ff8dcf" : "#aaa",
-                  }}
-                >
-                  {n.gender === "m" ? "J" : n.gender === "w" ? "M" : "?"}
-                </span>
-              </div>
-            ))
+              return (
+                <NameListRow
+                  key={n.id}
+                  nameData={n}
+                  statusStyle={statusStyle}
+                  isOpen={isOpen}
+                  canSwipe={canSwipe}
+                  swipeThreshold={swipeThreshold}
+                  dragActiveRef={dragActiveRef}
+                  onSelect={() => setSelectedName(n)}
+                  onSwipeDecision={(decision) => handleDecision(decision, n)}
+                />
+              );
+            })
           )}
         </div>
 
@@ -224,7 +375,333 @@ useEffect(() => {
             Neuen Namen hinzufügen
           </AppButton>
         </div>
+
+        {selectedName && (
+          <NameDecisionModal
+            name={selectedName}
+            decision={decisionMap[selectedName.id] || null}
+            busy={actionBusy}
+            onSelect={(decision) => handleDecision(decision, selectedName)}
+            onRemove={() => handleClearDecision(selectedName)}
+            onClose={() => setSelectedName(null)}
+          />
+        )}
       </AppCard>
     </AppBackground>
+  );
+}
+
+const decisionStatusStyles = {
+  like: { label: "Like", bg: "rgba(53,178,127,0.15)", color: "#1e7a57" },
+  maybe: { label: "Maybe", bg: "rgba(245,178,57,0.2)", color: "#b8781d" },
+  nope: { label: "Nope", bg: "rgba(224,93,93,0.2)", color: "#aa3b3b" },
+  open: { label: "Offen", bg: "#e6edf8", color: "#466a99" },
+};
+
+function NameListRow({
+  nameData,
+  statusStyle,
+  isOpen,
+  canSwipe,
+  swipeThreshold,
+  dragActiveRef,
+  onSelect,
+  onSwipeDecision,
+}) {
+  const controls = useAnimation();
+  const pendingRef = useRef(null);
+  const [pendingDecision, setPendingDecision] = useState(null);
+
+  useEffect(() => {
+    if (!canSwipe && pendingRef.current !== null) {
+      pendingRef.current = null;
+      setPendingDecision(null);
+    }
+  }, [canSwipe]);
+
+  const baseBackground = isOpen ? "#f7fbff" : "white";
+  const highlightBackground =
+    pendingDecision && swipeHighlight[pendingDecision]
+      ? swipeHighlight[pendingDecision]
+      : baseBackground;
+
+  return (
+    <motion.div
+      role="button"
+      tabIndex={0}
+      onClick={() => {
+        if (dragActiveRef.current) return;
+        onSelect();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      animate={controls}
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        background: highlightBackground,
+        padding: "10px 12px",
+        marginBottom: 6,
+        borderRadius: 8,
+        border: "1px solid #dce7f7",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+        cursor: "pointer",
+        transition: "background 0.15s ease",
+      }}
+      drag={canSwipe ? "x" : false}
+      dragConstraints={canSwipe ? { left: -120, right: 120 } : undefined}
+      dragElastic={0.2}
+      dragMomentum={false}
+      whileTap={{ scale: canSwipe ? 0.98 : 1 }}
+      onDrag={(event, info) => {
+        if (!canSwipe) return;
+        if (info.offset.x > swipeThreshold) {
+          if (pendingRef.current !== "like") {
+            pendingRef.current = "like";
+            setPendingDecision("like");
+          }
+        } else if (info.offset.x < -swipeThreshold) {
+          if (pendingRef.current !== "nope") {
+            pendingRef.current = "nope";
+            setPendingDecision("nope");
+          }
+        } else if (pendingRef.current !== null) {
+          pendingRef.current = null;
+          setPendingDecision(null);
+        }
+      }}
+      onDragStart={() => {
+        if (!canSwipe) return;
+        dragActiveRef.current = true;
+      }}
+      onDragEnd={(event, info) => {
+        if (!canSwipe) return;
+        dragActiveRef.current = false;
+
+        if (info.offset.x > swipeThreshold) {
+          onSwipeDecision("like");
+          pendingRef.current = null;
+          setPendingDecision(null);
+          return;
+        }
+
+        if (info.offset.x < -swipeThreshold) {
+          onSwipeDecision("nope");
+          pendingRef.current = null;
+          setPendingDecision(null);
+          return;
+        }
+
+        pendingRef.current = null;
+        setPendingDecision(null);
+
+        controls.start({
+          x: 0,
+          transition: { type: "spring", stiffness: 500, damping: 40 },
+        });
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <span style={{ fontSize: 16, fontWeight: 600, color: "#1663a6" }}>
+          {nameData.name}
+        </span>
+        <span
+          style={{
+            alignSelf: "flex-start",
+            padding: "2px 8px",
+            borderRadius: 999,
+            fontSize: 11,
+            fontWeight: 700,
+            background: statusStyle.bg,
+            color: statusStyle.color,
+          }}
+        >
+          {statusStyle.label}
+        </span>
+      </div>
+
+      <span
+        style={{
+          padding: "4px 8px",
+          borderRadius: 8,
+          fontSize: 12,
+          fontWeight: 700,
+          color: "white",
+          background:
+            nameData.gender === "m"
+              ? "#4a90e2"
+              : nameData.gender === "w"
+              ? "#ff8dcf"
+              : "#aaa",
+        }}
+      >
+        {nameData.gender === "m" ? "J" : nameData.gender === "w" ? "M" : "?"}
+      </span>
+    </motion.div>
+  );
+}
+
+const swipeHighlight = {
+  like: "rgba(53,178,127,0.18)",
+  nope: "rgba(224,93,93,0.25)",
+};
+
+const decisionStyles = {
+  like: {
+    label: "Like",
+    color: "#35b27f",
+  },
+  maybe: {
+    label: "Maybe",
+    color: "#f5b239",
+  },
+  nope: {
+    label: "Nope",
+    color: "#e05d5d",
+  },
+};
+
+function NameDecisionModal({ name, decision, busy, onSelect, onRemove, onClose }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.35)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: 16,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: 360,
+          background: "white",
+          borderRadius: 18,
+          padding: "28px 22px 22px",
+          position: "relative",
+          textAlign: "center",
+          boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
+        }}
+      >
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            border: "none",
+            background: "transparent",
+            fontSize: 20,
+            cursor: "pointer",
+            color: "#1663a6",
+          }}
+          aria-label="Schließen"
+        >
+          ×
+        </button>
+
+        <p
+          style={{
+            fontSize: 14,
+            textTransform: "uppercase",
+            letterSpacing: 1,
+            color: "#7d8fa6",
+            marginBottom: 6,
+          }}
+        >
+          Entscheidung für
+        </p>
+        <h2
+          style={{
+            fontSize: 30,
+            color: "#1663a6",
+            marginBottom: 22,
+            fontWeight: 800,
+          }}
+        >
+          {name.name}
+        </h2>
+
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            marginBottom: 16,
+          }}
+        >
+          {Object.entries(decisionStyles).map(([key, config]) => {
+            const active = decision === key;
+            return (
+              <button
+                key={key}
+                onClick={() => onSelect(key)}
+                disabled={busy}
+                style={{
+                  flex: 1,
+                  padding: "12px 8px",
+                  borderRadius: 10,
+                  border: "none",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: busy ? "not-allowed" : "pointer",
+                  background: active ? config.color : "#e3efff",
+                  color: active ? "white" : "#1663a6",
+                  opacity: busy ? 0.6 : 1,
+                  transition: "all 0.2s ease",
+                }}
+              >
+                {config.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={onRemove}
+          disabled={!decision || busy}
+          style={{
+            width: "100%",
+            padding: "10px 14px",
+            borderRadius: 10,
+            border: "1px solid #d6dfea",
+            background: decision ? "white" : "#f3f5f9",
+            color: decision ? "#b93131" : "#9aa7bb",
+            fontWeight: 600,
+            cursor: !decision || busy ? "not-allowed" : "pointer",
+            marginBottom: 12,
+          }}
+        >
+          Entscheidung verwerfen
+        </button>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: "100%",
+            padding: "10px 14px",
+            borderRadius: 10,
+            border: "none",
+            background: "#1663a6",
+            color: "white",
+            fontWeight: 700,
+            fontSize: 15,
+            cursor: "pointer",
+          }}
+        >
+          Schließen
+        </button>
+      </div>
+    </div>
   );
 }

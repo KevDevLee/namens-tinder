@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 
 import { supabase } from "../../lib/supabaseClient";
 import {
@@ -59,8 +59,14 @@ function SwipeHerContent() {
   const y = useMotionValue(0);
   const controls = useAnimation();
 
-  const likeOpacity = useTransform(x, v => v > 0 ? Math.min(v / 140, 1) : 0);
-  const nopeOpacity = useTransform(x, v => v < 0 ? Math.min(Math.abs(v) / 140, 1) : 0);
+  const likeOpacity = useTransform(x, (v) => (v > 0 ? Math.min(v / 140, 1) : 0));
+  const nopeOpacity = useTransform(x, (v) =>
+    v < 0 ? Math.min(Math.abs(v) / 140, 1) : 0
+  );
+
+  const horizontalThreshold = 120;
+  const [pendingDecision, setPendingDecision] = useState(null);
+  const isDraggingRef = useRef(false);
 
   const [otherUserId, setOtherUserId] = useState(null);
   const current = names[index];
@@ -70,6 +76,27 @@ function SwipeHerContent() {
     y.set(0);
     controls.set({ x: 0, y: 0, rotate: 0, opacity: 1 });
   }, [current?.id, controls, x, y]);
+
+  useEffect(() => {
+    const unsubscribe = x.on("change", (latest) => {
+      if (!isDraggingRef.current) {
+        setPendingDecision((prev) => (prev ? null : prev));
+        return;
+      }
+
+      let next = null;
+      if (latest > horizontalThreshold) next = "like";
+      else if (latest < -horizontalThreshold) next = "nope";
+
+      setPendingDecision((prev) => (prev === next ? prev : next));
+    });
+
+    return () => unsubscribe && unsubscribe();
+  }, [x]);
+
+  useEffect(() => {
+    setPendingDecision(null);
+  }, [current?.id]);
 
 
 
@@ -238,6 +265,9 @@ function SwipeHerContent() {
   // Drag-End Handler
   // --------------------------------------------------
   async function handleDragEnd(_, info) {
+    isDraggingRef.current = false;
+    setPendingDecision(null);
+
     const { offset, velocity } = info;
     const xOffset = offset.x;
     const yOffset = offset.y;
@@ -320,6 +350,16 @@ function SwipeHerContent() {
   // --------------------------------------------------
   // RENDER
   // --------------------------------------------------
+  const baseCardBackground = "linear-gradient(135deg,#ffffff,#e8f3ff)";
+  const likeBackground = "linear-gradient(135deg,#ebfff5,#d6f8e5)";
+  const nopeBackground = "linear-gradient(135deg,#fff0f0,#ffd8d8)";
+  const cardBackground =
+    pendingDecision === "like"
+      ? likeBackground
+      : pendingDecision === "nope"
+      ? nopeBackground
+      : baseCardBackground;
+
   return (
     <AppBackground>
       <AppCard
@@ -356,13 +396,16 @@ function SwipeHerContent() {
           animate={controls}
           initial={{ x: 0, y: 0, rotate: 0, opacity: 1 }}
           onDragEnd={handleDragEnd}
+          onDragStart={() => {
+            isDraggingRef.current = true;
+          }}
           style={{
             x,
             y,
             width: "100%",
             maxWidth: 260,
             height: 360,
-            background: "linear-gradient(135deg,#ffffff,#e8f3ff)",
+            background: cardBackground,
             borderRadius: 24,
             boxShadow: "0 12px 28px rgba(0,0,0,0.15)",
             display: "flex",
@@ -374,6 +417,7 @@ function SwipeHerContent() {
             position: "relative",
             userSelect: "none",
             margin: "0 auto 24px auto",
+            transition: "background 0.15s ease",
           }}
         >
           {current?.gender && (
