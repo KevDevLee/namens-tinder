@@ -25,16 +25,39 @@ export default function MatchesPage() {
         const otherRole = role === "papa" ? "mama" : "papa";
         const otherUserId = await getProfileIdByRole(otherRole);
 
-        const fetchDecisions = (userId) =>
-          userId
-            ? supabase
-                .from("decisions")
-                .select("id, name_id, decision")
-                .eq("user_id", userId)
-                .order("id", { ascending: false })
-            : Promise.resolve({ data: [] });
+        const fetchDecisions = async (userId) => {
+          if (!userId) return [];
 
-        const [{ data: myRows }, { data: otherRows }] = await Promise.all([
+          const pageSize = 1000;
+          let all = [];
+          let from = 0;
+
+          while (true) {
+            const { data, error } = await supabase
+              .from("decisions")
+              .select("id, name_id, decision")
+              .eq("user_id", userId)
+              .order("id", { ascending: false })
+              .range(from, from + pageSize - 1);
+
+            if (error) {
+              console.error("matches fetch decisions error:", error);
+              break;
+            }
+
+            if (!data || data.length === 0) break;
+
+            all = all.concat(data);
+
+            if (data.length < pageSize) break;
+
+            from += pageSize;
+          }
+
+          return all;
+        };
+
+        const [myRows, otherRows] = await Promise.all([
           fetchDecisions(user.id),
           fetchDecisions(otherUserId),
         ]);

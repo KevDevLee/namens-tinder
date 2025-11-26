@@ -28,13 +28,40 @@ export default function MyDecisionsPage() {
 
     async function load() {
       setBusy(true);
-      const { data, error } = await supabase
-        .from("decisions")
-        .select("id, name_id, decision, names(name, gender)")
-        .eq("user_id", user.id)
-        .order("id", { ascending: false });
 
-      if (!error && data) {
+      async function fetchAllMyDecisions() {
+        const pageSize = 1000;
+        let all = [];
+        let from = 0;
+
+        while (true) {
+          const { data, error } = await supabase
+            .from("decisions")
+            .select("id, name_id, decision, names(name, gender)")
+            .eq("user_id", user.id)
+            .order("id", { ascending: false })
+            .range(from, from + pageSize - 1);
+
+          if (error) {
+            console.error("my-decisions load error:", error);
+            break;
+          }
+
+          if (!data || data.length === 0) break;
+
+          all = all.concat(data);
+
+          if (data.length < pageSize) break;
+
+          from += pageSize;
+        }
+
+        return all;
+      }
+
+      const data = await fetchAllMyDecisions();
+
+      if (data) {
         const latestByName = new Map();
         data.forEach((row) => {
           if (!latestByName.has(row.name_id)) {
@@ -46,10 +73,15 @@ export default function MyDecisionsPage() {
         latestByName.forEach((row) => {
           const decision = row.decision;
           if (!grouped[decision]) grouped[decision] = [];
+          const normalizedGender = (row.names?.gender || "").toLowerCase();
           grouped[decision].push({
             id: row.id,
+            name_id: row.name_id,
             name: row.names?.name || "Unbekannt",
-            gender: row.names?.gender || null,
+            gender:
+              normalizedGender === "m" || normalizedGender === "w"
+                ? normalizedGender
+                : normalizedGender || null,
           });
         });
 
@@ -77,11 +109,14 @@ export default function MyDecisionsPage() {
   async function removeDecision(idToDelete) {
     if (!user?.id) return;
 
+    const target = entries[activeTab].find((item) => item.id === idToDelete);
+    if (!target) return;
+
     await supabase
       .from("decisions")
       .delete()
-      .eq("id", idToDelete)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .eq("name_id", target.name_id);
 
     setEntries((prev) => {
       const copy = structuredClone(prev);

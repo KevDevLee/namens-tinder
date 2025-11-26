@@ -23,12 +23,38 @@ export default function StatsDetailsPage() {
     if (loading || !allowed) return;
 
     async function load() {
-      const [{ data: profileRows }, { data: rows }] = await Promise.all([
+      async function fetchAllDecisions() {
+        const pageSize = 1000;
+        let all = [];
+        let from = 0;
+
+        while (true) {
+          const { data, error } = await supabase
+            .from("decisions")
+            .select("id, user_id, decision, name_id, names(name, gender)")
+            .order("id")
+            .range(from, from + pageSize - 1);
+
+          if (error) {
+            console.error("load decisions error:", error);
+            break;
+          }
+
+          if (!data || data.length === 0) break;
+
+          all = all.concat(data);
+
+          if (data.length < pageSize) break;
+
+          from += pageSize;
+        }
+
+        return all;
+      }
+
+      const [{ data: profileRows }, rows] = await Promise.all([
         supabase.from("profiles").select("id, role"),
-        supabase
-          .from("decisions")
-          .select("id, user_id, decision, name_id, names(name, gender)")
-          .order("id"),
+        fetchAllDecisions(),
       ]);
 
       if (!rows || !profileRows) return;
@@ -56,12 +82,16 @@ export default function StatsDetailsPage() {
         const role = roleMap[r.user_id];
         if (!role || !structured[role]) return;
 
+        const normalizedGender = (r.names?.gender || "").toLowerCase();
         structured[role][r.decision].push({
           id: r.id,
           user_id: r.user_id,
           name_id: r.name_id,
           name: r.names?.name || "",
-          gender: r.names?.gender || null,
+          gender:
+            normalizedGender === "m" || normalizedGender === "w"
+              ? normalizedGender
+              : normalizedGender || null,
         });
       });
 
@@ -74,6 +104,8 @@ export default function StatsDetailsPage() {
       });
 
       setData(structured);
+
+      console.log(rows);
     }
 
     load();
@@ -288,6 +320,53 @@ export default function StatsDetailsPage() {
             );
           })}
       </div>
+      {items.some((item) => item.gender !== "m" && item.gender !== "w") && (
+        <div style={{ gridColumn: "1 / span 2" }}>
+          <h3 style={{ color: "#1663a6", marginBottom: 8 }}>
+            ✨ Ohne Zuordnung
+          </h3>
+          {items
+            .filter((item) => item.gender !== "m" && item.gender !== "w")
+            .map((item) => {
+              const ownEntry = item.user_id === user?.id;
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    background: "#ffffff",
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    marginBottom: 8,
+                    boxShadow: "0 4px 10px rgba(0,0,0,0.10)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span style={{ color: "#1663a6", fontWeight: 600 }}>
+                    {item.name}
+                  </span>
+                  {ownEntry && (
+                    <button
+                      onClick={() => removeDecision(item.id)}
+                      style={{
+                        background: "#ff4d4d",
+                        border: "none",
+                        padding: "6px 10px",
+                        color: "white",
+                        borderRadius: 6,
+                        fontWeight: 600,
+                        fontSize: 14,
+                      }}
+                    >
+                      X
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+        </div>
+      )}
     </div>
   )}
 </div>

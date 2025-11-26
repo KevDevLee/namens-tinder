@@ -19,9 +19,38 @@ export default function StatsPage() {
   }, [authLoading, allowed]);
 
   async function loadStats() {
-    const [{ data: profileRows }, { data }] = await Promise.all([
+    async function fetchAllDecisions() {
+      const pageSize = 1000;
+      let all = [];
+      let from = 0;
+
+      while (true) {
+        const { data, error } = await supabase
+          .from("decisions")
+          .select("id, user_id, decision, name_id")
+          .order("id")
+          .range(from, from + pageSize - 1);
+
+        if (error) {
+          console.error("stats load error:", error);
+          break;
+        }
+
+        if (!data || data.length === 0) break;
+
+        all = all.concat(data);
+
+        if (data.length < pageSize) break;
+
+        from += pageSize;
+      }
+
+      return all;
+    }
+
+    const [{ data: profileRows }, data] = await Promise.all([
       supabase.from("profiles").select("id, role"),
-      supabase.from("decisions").select("id, user_id, decision, name_id").order("id"),
+      fetchAllDecisions(),
     ]);
 
     if (!data || !profileRows) return;
