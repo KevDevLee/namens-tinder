@@ -280,101 +280,109 @@ export default function NameManagerPage() {
           </button>
         </div>
 
-        {/* LETTER FILTER */}
         <div
           style={{
             display: "flex",
-            flexWrap: "wrap",
-            gap: 6,
-            justifyContent: "center",
-            marginBottom: 16,
+            gap: 12,
+            width: "100%",
+            alignItems: "flex-start",
+            marginBottom: 12,
           }}
         >
-          {letters.map((l) => (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+              maxHeight: "50vh",
+              overflowY: "auto",
+              paddingRight: 4,
+              flex: "0 0 56px",
+            }}
+          >
             <button
-              key={l}
-              onClick={() => setLetter(l)}
+              onClick={() => setLetter("ALL")}
               style={{
                 padding: "6px 10px",
                 borderRadius: 8,
                 border: "none",
                 fontWeight: 600,
-                background: letter === l ? "#4a90e2" : "#e3efff",
-                color: letter === l ? "white" : "#1663a6",
-                minWidth: 36,
+                background: letter === "ALL" ? "#4a90e2" : "#e3efff",
+                color: letter === "ALL" ? "white" : "#1663a6",
                 fontSize: 15,
               }}
             >
-              {l}
+              Alle
             </button>
-          ))}
+            {letters.map((l) => (
+              <button
+                key={l}
+                onClick={() => setLetter(l)}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  border: "none",
+                  fontWeight: 600,
+                  background: letter === l ? "#4a90e2" : "#e3efff",
+                  color: letter === l ? "white" : "#1663a6",
+                  fontSize: 15,
+                }}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
 
-          <button
-            onClick={() => setLetter("ALL")}
+          {/* NAME LIST (scrollable) */}
+          <div
             style={{
-              padding: "6px 10px",
-              borderRadius: 8,
-              border: "none",
-              fontWeight: 600,
-              background: letter === "ALL" ? "#4a90e2" : "#e3efff",
-              color: letter === "ALL" ? "white" : "#1663a6",
-              fontSize: 15,
+              flex: 1,
+              maxHeight: "50vh",
+              overflowY: "auto",
+              paddingRight: 4,
             }}
           >
-            Alle
-          </button>
-        </div>
+            {filteredNames.length === 0 ? (
+              <p
+                style={{
+                  color: "#1663a6",
+                  textAlign: "center",
+                  opacity: 0.7,
+                  marginTop: 20,
+                }}
+              >
+                Keine Namen gefunden.
+              </p>
+            ) : (
+              <AnimatePresence presenceAffectsLayout>
+                {filteredNames.map((n) => {
+                  const status = decisionMap[n.id] || "open";
+                  const statusStyle = decisionStatusStyles[status];
+                  const isOpen = status === "open";
+                  const canSwipe = showOnlyOpen && isOpen;
 
-        {/* NAME LIST (scrollable) */}
-        <div
-          style={{
-            flex: 1,
-            maxHeight: "50vh",
-            overflowY: "auto",
-            paddingRight: 4,
-            width: "100%",
-          }}
-        >
-          {filteredNames.length === 0 ? (
-            <p
-              style={{
-                color: "#1663a6",
-                textAlign: "center",
-                opacity: 0.7,
-                marginTop: 20,
-              }}
-            >
-              Keine Namen gefunden.
-            </p>
-          ) : (
-            <AnimatePresence presenceAffectsLayout>
-              {filteredNames.map((n) => {
-                const status = decisionMap[n.id] || "open";
-                const statusStyle = decisionStatusStyles[status];
-                const isOpen = status === "open";
-                const canSwipe = showOnlyOpen && isOpen;
-
-              return (
-                <NameListRow
-                  key={n.id}
-                  nameData={n}
-                  statusStyle={statusStyle}
-                  isOpen={isOpen}
-                  canSwipe={canSwipe}
-                  swipeThreshold={swipeThreshold}
-                  dragActiveRef={dragActiveRef}
-                  onSelect={() => setSelectedName(n)}
-                  onSwipeDecision={(decision) => handleDecision(decision, n)}
-                  onQuickDecision={
-                    isOpen
-                      ? (decision) => handleDecision(decision, n)
-                      : undefined
-                  }
-                />
-              );
-              })}
-            </AnimatePresence>
-          )}
+                  return (
+                    <NameListRow
+                      key={n.id}
+                      nameData={n}
+                      statusStyle={statusStyle}
+                      isOpen={isOpen}
+                      canSwipe={canSwipe}
+                      swipeThreshold={swipeThreshold}
+                      dragActiveRef={dragActiveRef}
+                      onSelect={() => setSelectedName(n)}
+                      onSwipeDecision={(decision) => handleDecision(decision, n)}
+                      onQuickDecision={
+                        isOpen
+                          ? (decision) => handleDecision(decision, n)
+                          : undefined
+                      }
+                    />
+                  );
+                })}
+              </AnimatePresence>
+            )}
+          </div>
         </div>
 
         {/* Add Name */}

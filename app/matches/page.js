@@ -13,6 +13,7 @@ export default function MatchesPage() {
   const [matches, setMatches] = useState([]);
   const [maybeMatches, setMaybeMatches] = useState([]);
   const [loadingMatches, setLoadingMatches] = useState(true);
+  const [showMaybes, setShowMaybes] = useState(false);
   const { user, role, loading, allowed } = useRoleGuard();
 
   useEffect(() => {
@@ -229,54 +230,91 @@ export default function MatchesPage() {
             )}
 
             {maybeMatches.length > 0 && (
-              <>
-                <h2
+              <div
+                style={{
+                  marginTop: 24,
+                  width: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                  alignItems: "center",
+                }}
+              >
+                <button
+                  onClick={() => setShowMaybes((prev) => !prev)}
                   style={{
-                    fontSize: 20,
+                    padding: "10px 16px",
+                    borderRadius: 12,
+                    border: "none",
+                    background: "#f1c97f",
+                    color: "#8a5800",
                     fontWeight: 700,
-                    color: "#1663a6",
-                    marginTop: 20,
-                    textAlign: "center",
-                  }}
-                >
-                  Offene Favoriten
-                </h2>
-                <p
-                  style={{
-                    color: "#4a4a4a",
-                    textAlign: "center",
-                    marginBottom: 10,
-                  }}
-                >
-                  Einer hat „Like“ und der andere „Maybe“ – oder beide „Maybe“.
-                </p>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
+                    fontSize: 16,
+                    cursor: "pointer",
+                    boxShadow: "0 4px 10px rgba(0,0,0,0.12)",
                     width: "100%",
-                    gap: 12,
                   }}
                 >
-                  {maybeMatches.map((m) => (
-                    <div
-                      key={m.id}
+                  {showMaybes
+                    ? "Maybe Matches ausblenden"
+                    : `Maybe Matches anzeigen (${maybeMatches.length})`}
+                </button>
+
+                {showMaybes && (
+                  <>
+                    <h2
                       style={{
-                        background: "linear-gradient(120deg, #fff5e5 0%, #ffe7c7 100%)",
-                        padding: "14px 18px",
-                        borderRadius: 14,
                         fontSize: 20,
                         fontWeight: 700,
-                        color: "#7a5200",
-                        boxShadow: "0 6px 14px rgba(0,0,0,0.15)",
+                        color: "#1663a6",
                         textAlign: "center",
                       }}
                     >
-                      {m.name}
+                      Offene Favoriten
+                    </h2>
+                    <p
+                      style={{
+                        color: "#4a4a4a",
+                        textAlign: "center",
+                        marginBottom: 10,
+                      }}
+                    >
+                      Einer hat „Like“ und der andere „Maybe“ – oder beide „Maybe“.
+                    </p>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                        width: "100%",
+                        gap: 12,
+                        maxHeight: 260,
+                        overflowY: "auto",
+                        paddingRight: 6,
+                      }}
+                    >
+                      {maybeMatches.map((m) => (
+                        <div
+                          key={m.id}
+                          style={{
+                            background:
+                              "linear-gradient(120deg, #fff5e5 0%, #ffe7c7 100%)",
+                            padding: "10px 12px",
+                            borderRadius: 12,
+                            fontSize: 16,
+                            fontWeight: 700,
+                            color: "#7a5200",
+                            boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+                            textAlign: "center",
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {m.name}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </>
+                  </>
+                )}
+              </div>
             )}
           </>
         )}
