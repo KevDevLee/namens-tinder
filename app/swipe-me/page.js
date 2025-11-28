@@ -219,7 +219,7 @@ function SwipeMeContent() {
 
     setHistory((prev) => [
       ...prev,
-      { nameId: current.id, decision: "like", index },
+      { nameId: current.id, name: current, decision: "like", index },
     ]);
     setShowUndo(true);
 
@@ -256,7 +256,7 @@ function SwipeMeContent() {
 
     setHistory((prev) => [
       ...prev,
-      { nameId: current.id, decision: "nope", index },
+      { nameId: current.id, name: current, decision: "nope", index },
     ]);
     setShowUndo(true);
 
@@ -278,7 +278,7 @@ function SwipeMeContent() {
 
     setHistory((prev) => [
       ...prev,
-      { nameId: current.id, decision: "maybe", index },
+      { nameId: current.id, name: current, decision: "maybe", index },
     ]);
     setShowUndo(true);
 
@@ -346,11 +346,16 @@ function SwipeMeContent() {
 
     setHistory((prev) => prev.slice(0, -1));
     setShowMatch(false);
+    setNames((prev) => {
+      const copy = [...prev];
+      copy.splice(last.index, 0, last.name);
+      return copy;
+    });
     setIndex(last.index);
     x.set(0);
     y.set(0);
     controls.set({ x: 0, y: 0, rotate: 0, opacity: 1 });
-    setShowUndo(false);
+    setShowUndo(history.length > 1);
   }
 
 
