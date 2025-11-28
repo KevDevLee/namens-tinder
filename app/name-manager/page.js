@@ -194,11 +194,13 @@ export default function NameManagerPage() {
     <AppBackground>
       <AppCard
         style={{
-          paddingBottom: 40,
+          paddingBottom: 16,
           maxHeight: "90vh",
           overflow: "hidden",
           width: "100%",
           position: "relative",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         <BackButton />
@@ -287,6 +289,8 @@ export default function NameManagerPage() {
             width: "100%",
             alignItems: "flex-start",
             marginBottom: 12,
+            flex: 1,
+            minHeight: 0,
           }}
         >
           <div
@@ -337,9 +341,10 @@ export default function NameManagerPage() {
           <div
             style={{
               flex: 1,
-              maxHeight: "50vh",
+              height: "100%",
               overflowY: "auto",
               paddingRight: 4,
+              minHeight: 0,
             }}
           >
             {filteredNames.length === 0 ? (
@@ -386,7 +391,17 @@ export default function NameManagerPage() {
         </div>
 
         {/* Add Name */}
-        <div style={{ marginTop: 24, textAlign: "center" }}>
+        <div
+          style={{
+            marginTop: 16,
+            paddingTop: 12,
+            textAlign: "center",
+            position: "sticky",
+            bottom: 0,
+            background: "white",
+            boxShadow: "0 -6px 12px rgba(255,255,255,0.85)",
+          }}
+        >
           <AppButton href="/add-name" style={{ background: "#4a90e2" }}>
             Neuen Namen hinzufügen
           </AppButton>

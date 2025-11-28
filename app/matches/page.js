@@ -197,7 +197,7 @@ export default function MatchesPage() {
                     textAlign: "center",
                   }}
                 >
-                  Gemeinsame Likes
+                  Gemeinsame Likes ({matches.length})
                 </h2>
                 <div
                   style={{
@@ -270,7 +270,7 @@ export default function MatchesPage() {
                         textAlign: "center",
                       }}
                     >
-                      Offene Favoriten
+                      Offene Favoriten ({maybeMatches.length})
                     </h2>
                     <p
                       style={{
