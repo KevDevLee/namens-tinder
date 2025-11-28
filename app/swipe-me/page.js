@@ -141,19 +141,32 @@ function SwipeMeContent() {
     async function loadNames() {
       const allNames = await fetchAllNames(genderFilter);
 
-      const { data: decisionsData, error } = await supabase
-        .from("decisions")
-        .select("name_id")
-        .eq("user_id", user.id);
+      let decidedIds = [];
+      const pageSize = 1000;
+      let from = 0;
 
-      if (error) {
-        console.error("loadNames decisions error:", error);
-        setNames(allNames);
-        return;
+      while (true) {
+        const { data, error } = await supabase
+          .from("decisions")
+          .select("name_id")
+          .eq("user_id", user.id)
+          .order("id", { ascending: false })
+          .range(from, from + pageSize - 1);
+
+        if (error) {
+          console.error("loadNames decisions error:", error);
+          break;
+        }
+
+        if (!data || data.length === 0) break;
+        decidedIds = decidedIds.concat(data.map((d) => d.name_id));
+
+        if (data.length < pageSize) break;
+        from += pageSize;
       }
 
-      const decidedIds = new Set((decisionsData || []).map((d) => d.name_id));
-      const remaining = allNames.filter((n) => !decidedIds.has(n.id));
+      const decidedSet = new Set(decidedIds);
+      const remaining = allNames.filter((n) => !decidedSet.has(n.id));
 
       setNames(shuffleArray(remaining));
       setTotalCount(allNames.length);
