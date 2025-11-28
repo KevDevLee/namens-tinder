@@ -447,7 +447,7 @@ function SwipeHerContent() {
             letterSpacing: 0.3,
           }}
         >
-          {labelPrefix}: {remainingCount}/{totalDisplayCount}
+          Noch {remainingCount} übrig
         </p>
         <p
           style={{
