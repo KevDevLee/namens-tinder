@@ -281,7 +281,10 @@ export default function NameManagerPage() {
         </div>
 
         <div style={{ marginBottom: 14, textAlign: "center" }}>
-          <AppButton href="/add-name" style={{ background: "#4a90e2" }}>
+          <AppButton
+            href="/add-name"
+            style={{ background: "#4a90e2", fontSize: 16, padding: "10px 14px" }}
+          >
             Neuen Namen hinzufügen
           </AppButton>
         </div>
@@ -390,14 +393,7 @@ export default function NameManagerPage() {
             )}
           </div>
         </div>
-
-        {/* Add Name */}
-        <div style={{ marginTop: 24, textAlign: "center" }}>
-          <AppButton href="/add-name" style={{ background: "#4a90e2" }}>
-            Neuen Namen hinzufügen
-          </AppButton>
-        </div>
-
+        
         {selectedName && (
           <NameDecisionModal
             name={selectedName}
