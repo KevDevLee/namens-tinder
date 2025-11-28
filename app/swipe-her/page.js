@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 
 import { supabase } from "../../lib/supabaseClient";
 import {
@@ -63,11 +63,16 @@ function SwipeHerContent() {
   const nopeOpacity = useTransform(x, (v) =>
     v < 0 ? Math.min(Math.abs(v) / 140, 1) : 0
   );
+  const maybeOpacity = useTransform(y, (v) =>
+    v < 0 ? Math.min(Math.abs(v) / 120, 1) : 0
+  );
 
   const horizontalThreshold = 120;
+  const verticalThreshold = 80;
   const highlightThreshold = 95;
   const [pendingDecision, setPendingDecision] = useState(null);
   const isDraggingRef = useRef(false);
+  const latestCoords = useRef({ x: 0, y: 0 });
 
   const [otherUserId, setOtherUserId] = useState(null);
   const current = names[index];
@@ -78,22 +83,40 @@ function SwipeHerContent() {
     controls.set({ x: 0, y: 0, rotate: 0, opacity: 1 });
   }, [current?.id, controls, x, y]);
 
-  useEffect(() => {
-    const unsubscribe = x.on("change", (latest) => {
+  const evaluatePending = useCallback(
+    (latestX, latestY) => {
       if (!isDraggingRef.current) {
         setPendingDecision(null);
         return;
       }
 
       let next = null;
-      if (latest > highlightThreshold) next = "like";
-      else if (latest < -highlightThreshold) next = "nope";
+      if (latestX > highlightThreshold) next = "like";
+      else if (latestX < -highlightThreshold) next = "nope";
+      else if (latestY < -verticalThreshold) next = "maybe";
 
       setPendingDecision((prev) => (prev === next ? prev : next));
+    },
+    [highlightThreshold, verticalThreshold]
+  );
+
+  useEffect(() => {
+    const unsubscribe = x.on("change", (latest) => {
+      latestCoords.current.x = latest;
+      evaluatePending(latest, latestCoords.current.y);
     });
 
     return () => unsubscribe && unsubscribe();
-  }, [x]);
+  }, [x, evaluatePending]);
+
+  useEffect(() => {
+    const unsubscribe = y.on("change", (latest) => {
+      latestCoords.current.y = latest;
+      evaluatePending(latestCoords.current.x, latest);
+    });
+
+    return () => unsubscribe && unsubscribe();
+  }, [y, evaluatePending]);
 
   useEffect(() => {
     setPendingDecision(null);
@@ -286,7 +309,7 @@ function SwipeHerContent() {
       return nope();
     }
 
-    if (yOffset < -140 || fastUp) {
+    if (yOffset < -verticalThreshold || fastUp) {
       isDraggingRef.current = false;
       setPendingDecision(null);
       return skip();
@@ -359,11 +382,14 @@ function SwipeHerContent() {
   const baseCardBackground = "linear-gradient(135deg,#ffffff,#e8f3ff)";
   const likeBackground = "linear-gradient(135deg,#ebfff5,#d6f8e5)";
   const nopeBackground = "linear-gradient(135deg,#fff0f0,#ffd8d8)";
+  const maybeBackground = "linear-gradient(135deg,#fffbe6,#fff0bf)";
   const cardBackground =
     pendingDecision === "like"
       ? likeBackground
       : pendingDecision === "nope"
       ? nopeBackground
+      : pendingDecision === "maybe"
+      ? maybeBackground
       : baseCardBackground;
 
   return (
@@ -479,6 +505,24 @@ function SwipeHerContent() {
             }}
           >
             Nein ✖️
+          </motion.div>
+          <motion.div
+            style={{
+              opacity: maybeOpacity,
+              position: "absolute",
+              bottom: 24,
+              left: "50%",
+              transform: "translateX(-50%)",
+              padding: "6px 16px",
+              fontSize: 20,
+              borderRadius: 12,
+              background: "rgba(255,214,10,0.25)",
+              border: "2px solid #ffd60a",
+              color: "#b88600",
+              pointerEvents: "none",
+            }}
+          >
+            Vielleicht ?
           </motion.div>
 
           <div style={{ textAlign: "center" }}>
