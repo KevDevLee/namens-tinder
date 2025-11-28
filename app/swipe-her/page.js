@@ -46,6 +46,7 @@ function SwipeHerContent() {
   const [matchName, setMatchName] = useState("");
 
   const [lastName, setLastName] = useState("");   // ✔ SSR-safe
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("babyLastName");
@@ -75,6 +76,14 @@ function SwipeHerContent() {
   const latestCoords = useRef({ x: 0, y: 0 });
 
   const [otherUserId, setOtherUserId] = useState(null);
+  const remainingCount = names.length;
+  const totalDisplayCount = Math.max(totalCount, remainingCount);
+  const labelPrefix =
+    genderFilter === "m"
+      ? "Jungen"
+      : genderFilter === "w"
+      ? "Mädchen"
+      : "Namen";
   const current = names[index];
 
   useEffect(() => {
@@ -148,6 +157,7 @@ function SwipeHerContent() {
       const remaining = allNames.filter((n) => !decidedIds.has(n.id));
 
       setNames(shuffleArray(remaining));
+      setTotalCount(allNames.length);
     }
 
     loadNames();
@@ -167,8 +177,18 @@ function SwipeHerContent() {
   // --------------------------------------------------
   // nextCard
   // --------------------------------------------------
-  function nextCard() {
-    setIndex(prev => (prev + 1) % names.length);
+  function removeCurrentAndAdvance() {
+    setNames((prev) => {
+      if (!prev.length) return prev;
+      const updated = [...prev];
+      updated.splice(index, 1);
+      if (updated.length === 0) {
+        setIndex(0);
+      } else if (index >= updated.length) {
+        setIndex(0);
+      }
+      return updated;
+    });
     x.set(0);
     y.set(0);
     controls.set({ x: 0, y: 0, rotate: 0, opacity: 1 });
@@ -227,7 +247,7 @@ function SwipeHerContent() {
       transition: { duration: 0.3 }
     });
 
-    nextCard();
+    removeCurrentAndAdvance();
   }
 
 
@@ -253,7 +273,7 @@ function SwipeHerContent() {
       transition: { duration: 0.3 }
     });
 
-    nextCard();
+    removeCurrentAndAdvance();
   }
 
 
@@ -280,7 +300,7 @@ function SwipeHerContent() {
     });
 
     y.set(0);
-    nextCard();
+    removeCurrentAndAdvance();
   }
 
 
@@ -416,6 +436,34 @@ function SwipeHerContent() {
         >
           Mama Swipe
         </h1>
+        <p
+          style={{
+            color: "#8a96aa",
+            marginTop: -6,
+            marginBottom: 16,
+            textAlign: "center",
+            fontSize: 13,
+            fontWeight: 600,
+            letterSpacing: 0.3,
+          }}
+        >
+          {labelPrefix}: {remainingCount}/{totalDisplayCount}
+        </p>
+        <p
+          style={{
+            color: "#4a4a4a",
+            marginTop: -4,
+            marginBottom: 16,
+            textAlign: "center",
+            fontSize: 14,
+          }}
+        >
+          {genderFilter === "m"
+            ? `${remainingCount} Jungen übrig`
+            : genderFilter === "w"
+            ? `${remainingCount} Mädchen übrig`
+            : `${remainingCount} Namen übrig`}
+        </p>
 
 
         {/* SWIPE CARD */}
