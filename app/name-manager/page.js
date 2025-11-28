@@ -280,6 +280,12 @@ export default function NameManagerPage() {
           </button>
         </div>
 
+        <div style={{ marginBottom: 14, textAlign: "center" }}>
+          <AppButton href="/add-name" style={{ background: "#4a90e2" }}>
+            Neuen Namen hinzufügen
+          </AppButton>
+        </div>
+
         <div
           style={{
             display: "flex",
@@ -403,6 +409,7 @@ export default function NameManagerPage() {
           />
         )}
       </AppCard>
+
     </AppBackground>
   );
 }
