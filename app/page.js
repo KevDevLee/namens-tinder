@@ -425,6 +425,16 @@ export default function Home() {
               Namensmanager
             </AppButton>
 
+          </motion.div>
+          <div
+            style={{
+              marginTop: 24,
+              width: "100%",
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
             <AppButton
               href="/showcase"
               style={{
@@ -433,26 +443,27 @@ export default function Home() {
                 fontSize: 14,
                 padding: "8px 12px",
                 opacity: 0.85,
+                flex: 1,
               }}
             >
               Demo ansehen
             </AppButton>
-          </motion.div>
-
-          <button
-            onClick={signOut}
-            style={{
-              marginTop: 24,
-              background: "none",
-              border: "none",
-              color: "#d7263d",
-              fontWeight: 600,
-              cursor: "pointer",
-              textDecoration: "underline",
-            }}
-          >
-            Logout
-          </button>
+            <button
+              onClick={signOut}
+              style={{
+                flex: 1,
+                border: "1px solid rgba(215,38,61,0.4)",
+                color: "#d7263d",
+                borderRadius: 12,
+                background: "none",
+                fontWeight: 600,
+                cursor: "pointer",
+                padding: "10px 12px",
+              }}
+            >
+              Logout
+            </button>
+          </div>
         </AppCard>
       </motion.div>
     </AppBackground>

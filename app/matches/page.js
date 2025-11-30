@@ -377,6 +377,11 @@ function getGenderStyling(gender) {
 function MatchNameCard({ name, onClick, compact = false }) {
   const styling = getGenderStyling(name?.gender);
   const decisionLabel = name?.myDecision ? decisionLabels[name.myDecision] : null;
+  const pillColors = {
+    like: { bg: "rgba(53,178,127,0.15)", color: "#1e7a57" },
+    maybe: { bg: "rgba(245,178,57,0.2)", color: "#b8781d" },
+    nope: { bg: "rgba(224,93,93,0.2)", color: "#aa3b3b" },
+  };
   return (
     <button
       type="button"
@@ -408,8 +413,8 @@ function MatchNameCard({ name, onClick, compact = false }) {
               marginTop: 4,
               padding: "2px 8px",
               borderRadius: 999,
-              background: "rgba(22,99,166,0.08)",
-              color: "#4a6180",
+              background: pillColors[name.myDecision]?.bg || "rgba(22,99,166,0.08)",
+              color: pillColors[name.myDecision]?.color || "#4a6180",
               fontSize: 11,
               fontWeight: 700,
             }}
