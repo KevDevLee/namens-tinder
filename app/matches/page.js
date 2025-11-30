@@ -14,6 +14,7 @@ export default function MatchesPage() {
   const [maybeMatches, setMaybeMatches] = useState([]);
   const [loadingMatches, setLoadingMatches] = useState(true);
   const [showMaybes, setShowMaybes] = useState(false);
+  const [activeName, setActiveName] = useState(null);
   const { user, role, loading, allowed } = useRoleGuard();
 
   useEffect(() => {
@@ -209,21 +210,7 @@ export default function MatchesPage() {
                   }}
                 >
                   {matches.map((m) => (
-                    <div
-                      key={m.id}
-                      style={{
-                        background: "linear-gradient(120deg, #e8f3ff 0%, #ffffff 100%)",
-                        padding: "14px 18px",
-                        borderRadius: 14,
-                        fontSize: 20,
-                        fontWeight: 700,
-                        color: "#1663a6",
-                        boxShadow: "0 6px 14px rgba(0,0,0,0.15)",
-                        textAlign: "center",
-                      }}
-                    >
-                      {m.name}
-                    </div>
+                    <MatchNameCard key={m.id} name={m} onClick={() => setActiveName(m)} />
                   ))}
                 </div>
               </>
@@ -293,23 +280,12 @@ export default function MatchesPage() {
                       }}
                     >
                       {maybeMatches.map((m) => (
-                        <div
+                        <MatchNameCard
                           key={m.id}
-                          style={{
-                            background:
-                              "linear-gradient(120deg, #fff5e5 0%, #ffe7c7 100%)",
-                            padding: "10px 12px",
-                            borderRadius: 12,
-                            fontSize: 16,
-                            fontWeight: 700,
-                            color: "#7a5200",
-                            boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
-                            textAlign: "center",
-                            wordBreak: "break-word",
-                          }}
-                        >
-                          {m.name}
-                        </div>
+                          name={m}
+                          compact
+                          onClick={() => setActiveName(m)}
+                        />
                       ))}
                     </div>
                   </>
@@ -318,7 +294,172 @@ export default function MatchesPage() {
             )}
           </>
         )}
+
+        {activeName && (
+          <MatchNameModal name={activeName} onClose={() => setActiveName(null)} />
+        )}
       </AppCard>
     </AppBackground>
+  );
+}
+
+function getGenderStyling(gender) {
+  const base = {
+    bg: "linear-gradient(120deg,#f1f5fb 0%,#ffffff 100%)",
+    badgeBg: "#a0a0a0",
+    badgeLabel: "?",
+    text: "#344861",
+  };
+
+  if ((gender || "").toLowerCase() === "m") {
+    return {
+      bg: "linear-gradient(120deg,#e3f0ff 0%,#ffffff 100%)",
+      badgeBg: "#4a90e2",
+      badgeLabel: "J",
+      text: "#1663a6",
+    };
+  }
+
+  if ((gender || "").toLowerCase() === "w") {
+    return {
+      bg: "linear-gradient(120deg,#ffe6f2 0%,#ffffff 100%)",
+      badgeBg: "#ff8dcf",
+      badgeLabel: "M",
+      text: "#b0307a",
+    };
+  }
+
+  return base;
+}
+
+function MatchNameCard({ name, onClick, compact = false }) {
+  const styling = getGenderStyling(name?.gender);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        background: styling.bg,
+        padding: compact ? "10px 12px" : "14px 18px",
+        borderRadius: 14,
+        fontSize: compact ? 16 : 20,
+        fontWeight: 700,
+        color: styling.text,
+        boxShadow: "0 6px 14px rgba(0,0,0,0.12)",
+        textAlign: "center",
+        border: "none",
+        width: "100%",
+        cursor: "pointer",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 12,
+      }}
+    >
+      <span style={{ flex: 1 }}>{name?.name}</span>
+      <span
+        style={{
+          padding: "4px 10px",
+          borderRadius: 999,
+          background: styling.badgeBg,
+          color: "#fff",
+          fontSize: 12,
+          fontWeight: 800,
+        }}
+      >
+        {styling.badgeLabel}
+      </span>
+    </button>
+  );
+}
+
+function MatchNameModal({ name, onClose }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 16,
+        zIndex: 2000,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: 360,
+          background: "#fff",
+          borderRadius: 20,
+          padding: "28px 22px",
+          textAlign: "center",
+          position: "relative",
+          boxShadow: "0 30px 50px rgba(0,0,0,0.25)",
+        }}
+      >
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 12,
+            border: "none",
+            background: "transparent",
+            fontSize: 22,
+            cursor: "pointer",
+            color: "#1663a6",
+          }}
+          aria-label="Schließen"
+        >
+          ×
+        </button>
+        <p
+          style={{
+            textTransform: "uppercase",
+            letterSpacing: 1,
+            fontSize: 13,
+            color: "#8a96aa",
+            marginBottom: 6,
+          }}
+        >
+          Match
+        </p>
+        <h2
+          style={{
+            fontSize: 32,
+            color: "#1663a6",
+            marginBottom: 12,
+          }}
+        >
+          {name?.name}
+        </h2>
+        <p style={{ color: "#4a4a4a", marginBottom: 24 }}>
+          {name?.gender === "m"
+            ? "Jungenname"
+            : name?.gender === "w"
+            ? "Mädchenname"
+            : "Ohne Zuordnung"}
+        </p>
+        <button
+          onClick={onClose}
+          style={{
+            width: "100%",
+            padding: "10px 16px",
+            borderRadius: 12,
+            border: "none",
+            background: "#1663a6",
+            color: "white",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          Schließen
+        </button>
+      </div>
+    </div>
   );
 }
