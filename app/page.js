@@ -424,6 +424,19 @@ export default function Home() {
             >
               Namensmanager
             </AppButton>
+
+            <AppButton
+              href="/showcase"
+              style={{
+                background: "#eef4ff",
+                color: "#4a5f7a",
+                fontSize: 14,
+                padding: "8px 12px",
+                opacity: 0.85,
+              }}
+            >
+              Demo ansehen
+            </AppButton>
           </motion.div>
 
           <button
