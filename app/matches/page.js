@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
 import AppBackground from "../components/AppBackground";
@@ -15,128 +15,165 @@ export default function MatchesPage() {
   const [loadingMatches, setLoadingMatches] = useState(true);
   const [showMaybes, setShowMaybes] = useState(false);
   const [activeName, setActiveName] = useState(null);
+  const [updatingDecision, setUpdatingDecision] = useState(false);
   const { user, role, loading, allowed } = useRoleGuard();
 
-  useEffect(() => {
-    async function loadMatches() {
-      if (!user?.id) return;
+  const loadMatches = useCallback(async () => {
+    if (!user?.id) return;
 
-      setLoadingMatches(true);
+    setLoadingMatches(true);
 
-      try {
-        const otherRole = role === "papa" ? "mama" : "papa";
-        const otherUserId = await getProfileIdByRole(otherRole);
+    try {
+      const otherRole = role === "papa" ? "mama" : "papa";
+      const otherUserId = await getProfileIdByRole(otherRole);
 
-        const fetchDecisions = async (userId) => {
-          if (!userId) return [];
+      const fetchDecisions = async (userId) => {
+        if (!userId) return [];
 
-          const pageSize = 1000;
-          let all = [];
-          let from = 0;
+        const pageSize = 1000;
+        let all = [];
+        let from = 0;
 
-          while (true) {
-            const { data, error } = await supabase
-              .from("decisions")
-              .select("id, name_id, decision")
-              .eq("user_id", userId)
-              .order("id", { ascending: false })
-              .range(from, from + pageSize - 1);
+        while (true) {
+          const { data, error } = await supabase
+            .from("decisions")
+            .select("id, name_id, decision")
+            .eq("user_id", userId)
+            .order("id", { ascending: false })
+            .range(from, from + pageSize - 1);
 
-            if (error) {
-              console.error("matches fetch decisions error:", error);
-              break;
-            }
-
-            if (!data || data.length === 0) break;
-
-            all = all.concat(data);
-
-            if (data.length < pageSize) break;
-
-            from += pageSize;
+          if (error) {
+            console.error("matches fetch decisions error:", error);
+            break;
           }
 
-          return all;
-        };
+          if (!data || data.length === 0) break;
 
-        const [myRows, otherRows] = await Promise.all([
-          fetchDecisions(user.id),
-          fetchDecisions(otherUserId),
-        ]);
+          all = all.concat(data);
 
-        const latestByName = (rows) => {
-          const map = new Map();
-          (rows || []).forEach((row) => {
-            if (!map.has(row.name_id)) {
-              map.set(row.name_id, row.decision);
-            }
-          });
-          return map;
-        };
+          if (data.length < pageSize) break;
 
-        const myLatest = latestByName(myRows);
-        const otherLatest = latestByName(otherRows);
-
-        const allNameIds = new Set([
-          ...myLatest.keys(),
-          ...otherLatest.keys(),
-        ]);
-
-        const confirmedMatches = [];
-        const maybeCandidates = [];
-
-        allNameIds.forEach((nameId) => {
-          const myDecision = myLatest.get(nameId);
-          const otherDecision = otherLatest.get(nameId);
-
-          if (myDecision === "like" && otherDecision === "like") {
-            confirmedMatches.push(nameId);
-          } else if (
-            (myDecision === "like" && otherDecision === "maybe") ||
-            (myDecision === "maybe" && otherDecision === "like") ||
-            (myDecision === "maybe" && otherDecision === "maybe")
-          ) {
-            maybeCandidates.push(nameId);
-          }
-        });
-
-        const combinedIds = [...new Set([...confirmedMatches, ...maybeCandidates])];
-
-        if (combinedIds.length === 0) {
-          setMatches([]);
-          setMaybeMatches([]);
-          setLoadingMatches(false);
-          return;
+          from += pageSize;
         }
 
-        const { data: names } = await supabase
-          .from("names")
-          .select("*")
-          .in("id", combinedIds)
-          .order("name");
+        return all;
+      };
 
-        const nameMap = new Map((names || []).map((n) => [n.id, n]));
+      const [myRows, otherRows] = await Promise.all([
+        fetchDecisions(user.id),
+        fetchDecisions(otherUserId),
+      ]);
 
-        setMatches(
-          confirmedMatches
-            .map((id) => nameMap.get(id))
-            .filter(Boolean)
-        );
-        setMaybeMatches(
-          maybeCandidates
-            .map((id) => nameMap.get(id))
-            .filter(Boolean)
-        );
-      } catch (err) {
-        console.error("loadMatches error:", err);
+      const latestByName = (rows) => {
+        const map = new Map();
+        (rows || []).forEach((row) => {
+          if (!map.has(row.name_id)) {
+            map.set(row.name_id, row.decision);
+          }
+        });
+        return map;
+      };
+
+      const myLatest = latestByName(myRows);
+      const otherLatest = latestByName(otherRows);
+
+      const allNameIds = new Set([
+        ...myLatest.keys(),
+        ...otherLatest.keys(),
+      ]);
+
+      const confirmedMatches = [];
+      const maybeCandidates = [];
+
+      allNameIds.forEach((nameId) => {
+        const myDecision = myLatest.get(nameId);
+        const otherDecision = otherLatest.get(nameId);
+
+        if (myDecision === "like" && otherDecision === "like") {
+          confirmedMatches.push(nameId);
+        } else if (
+          (myDecision === "like" && otherDecision === "maybe") ||
+          (myDecision === "maybe" && otherDecision === "like") ||
+          (myDecision === "maybe" && otherDecision === "maybe")
+        ) {
+          maybeCandidates.push(nameId);
+        }
+      });
+
+      const combinedIds = [...new Set([...confirmedMatches, ...maybeCandidates])];
+
+      if (combinedIds.length === 0) {
         setMatches([]);
-      } finally {
+        setMaybeMatches([]);
         setLoadingMatches(false);
+        return;
       }
-    }
 
-    loadMatches();
+      const { data: names } = await supabase
+        .from("names")
+        .select("*")
+        .in("id", combinedIds)
+        .order("name");
+
+      const nameMap = new Map((names || []).map((n) => [n.id, n]));
+
+      setMatches(
+        confirmedMatches
+          .map((id) => {
+            const info = nameMap.get(id);
+            if (!info) return null;
+            return { ...info, myDecision: myLatest.get(id) };
+          })
+          .filter(Boolean)
+      );
+      setMaybeMatches(
+        maybeCandidates
+          .map((id) => {
+            const info = nameMap.get(id);
+            if (!info) return null;
+            return { ...info, myDecision: myLatest.get(id) };
+          })
+          .filter(Boolean)
+      );
+    } catch (err) {
+      console.error("loadMatches error:", err);
+      setMatches([]);
+    } finally {
+      setLoadingMatches(false);
+    }
   }, [user?.id, role]);
+
+  useEffect(() => {
+    loadMatches();
+  }, [loadMatches]);
+
+  const handleDecisionChange = useCallback(
+    async (nameId, decision) => {
+      if (!user?.id) return;
+      setUpdatingDecision(true);
+      const { error } = await supabase
+        .from("decisions")
+        .upsert(
+          {
+            user_id: user.id,
+            name_id: nameId,
+            decision,
+          },
+          { onConflict: "user_id,name_id" }
+        );
+
+      if (error) {
+        console.error("update decision error", error);
+      } else {
+        await loadMatches();
+        setActiveName((prev) =>
+          prev && prev.id === nameId ? { ...prev, myDecision: decision } : prev
+        );
+      }
+      setUpdatingDecision(false);
+    },
+    [user?.id, loadMatches]
+  );
 
   if (loading || !allowed) {
     return <AppBackground>Loading…</AppBackground>;
@@ -296,7 +333,12 @@ export default function MatchesPage() {
         )}
 
         {activeName && (
-          <MatchNameModal name={activeName} onClose={() => setActiveName(null)} />
+          <MatchNameModal
+            name={activeName}
+            onClose={() => setActiveName(null)}
+            onDecisionChange={handleDecisionChange}
+            updating={updatingDecision}
+          />
         )}
       </AppCard>
     </AppBackground>
@@ -334,6 +376,7 @@ function getGenderStyling(gender) {
 
 function MatchNameCard({ name, onClick, compact = false }) {
   const styling = getGenderStyling(name?.gender);
+  const decisionLabel = name?.myDecision ? decisionLabels[name.myDecision] : null;
   return (
     <button
       type="button"
@@ -356,7 +399,25 @@ function MatchNameCard({ name, onClick, compact = false }) {
         gap: 12,
       }}
     >
-      <span style={{ flex: 1 }}>{name?.name}</span>
+      <div style={{ flex: 1, textAlign: "left" }}>
+        <div>{name?.name}</div>
+        {decisionLabel && (
+          <span
+            style={{
+              display: "inline-block",
+              marginTop: 4,
+              padding: "2px 8px",
+              borderRadius: 999,
+              background: "rgba(22,99,166,0.08)",
+              color: "#4a6180",
+              fontSize: 11,
+              fontWeight: 700,
+            }}
+          >
+            {decisionLabel}
+          </span>
+        )}
+      </div>
       <span
         style={{
           padding: "4px 10px",
@@ -373,7 +434,20 @@ function MatchNameCard({ name, onClick, compact = false }) {
   );
 }
 
-function MatchNameModal({ name, onClose }) {
+const decisionLabels = {
+  like: "Like",
+  maybe: "Maybe",
+  nope: "Nope",
+};
+
+function MatchNameModal({ name, onClose, onDecisionChange, updating }) {
+  const currentDecision = name?.myDecision || null;
+
+  const handleDecision = (decision) => {
+    if (updating || !onDecisionChange || decision === currentDecision) return;
+    onDecisionChange(name.id, decision);
+  };
+
   return (
     <div
       onClick={onClose}
@@ -444,6 +518,41 @@ function MatchNameModal({ name, onClose }) {
             ? "Mädchenname"
             : "Ohne Zuordnung"}
         </p>
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ color: "#6c7890", marginBottom: 10, fontWeight: 600 }}>
+            Deine Entscheidung: {currentDecision ? decisionLabels[currentDecision] : "Keine"}
+          </p>
+          <div style={{ display: "flex", gap: 10 }}>
+            {["like", "maybe", "nope"].map((type) => {
+              const active = currentDecision === type;
+              const colors = {
+                like: "#35b27f",
+                maybe: "#f5b239",
+                nope: "#e05d5d",
+              };
+              return (
+                <button
+                  key={type}
+                  onClick={() => handleDecision(type)}
+                  disabled={updating}
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "none",
+                    fontWeight: 700,
+                    color: active ? "#fff" : "#1663a6",
+                    background: active ? colors[type] : "#e3efff",
+                    cursor: updating ? "not-allowed" : "pointer",
+                    opacity: updating && !active ? 0.6 : 1,
+                  }}
+                >
+                  {decisionLabels[type]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <button
           onClick={onClose}
           style={{
